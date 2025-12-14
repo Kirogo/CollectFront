@@ -1,79 +1,102 @@
-// src/components/Layout/Sidebar.jsx
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import '../../../src/styles/components.css';
+// src/components/layout/Sidebar.jsx - UPDATED VERSION
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { colors } from '../../styles/theme';
 
-const Sidebar = ({ user, onLogout }) => {
+const Sidebar = ({ user, onMenuToggle }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+
   const menuItems = [
     {
-      title: 'Collections Dashboard',
-      items: [
-        { path: '/', label: 'STK Push Repayment', icon: '💰' },
-        { path: '/overview', label: '360 View', icon: '📊' },
-        { path: '/metrics', label: 'Performance Metrics', icon: '📈' },
-      ],
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: '📊',
+      path: '/dashboard'
     },
     {
-      title: 'Customer Management',
-      items: [
-        { path: '/customers', label: 'Customer Search', icon: '🔍' },
-        { path: '/workload', label: 'Work Load Enquiry', icon: '📋' },
-        { path: '/referrals', label: 'Referral Enquiry', icon: '🔄' },
-        { path: '/ptp', label: 'PTP Enquiry', icon: '🤝' },
-        { path: '/statistics', label: 'Kollect Statistics', icon: '📊' },
-        { path: '/debt-cards', label: 'Debt Card Enquiry', icon: '💳' },
-      ],
+      id: 'customers',
+      label: 'Customers',
+      icon: '👥',
+      path: '/customers'
     },
     {
-      title: 'Modules',
-      items: [
-        { path: '/crb', label: 'CRB Menu', icon: '📋' },
-        { path: '/ecd', label: 'ECD Process', icon: '⚙️' },
-        { path: '/reports', label: 'Reports', icon: '📄' },
-        { path: '/settings', label: 'Settings', icon: '⚙️' },
-      ],
+      id: 'transactions',
+      label: 'Transactions',
+      icon: '📝',
+      path: '/transactions'
     },
+    {
+      id: 'reports',
+      label: 'Reports',
+      icon: '📈',
+      path: '/reports'
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: '⚙️',
+      path: '/settings'
+    }
   ];
 
+  const handleCollapse = () => {
+    setCollapsed(!collapsed);
+    if (onMenuToggle) onMenuToggle();
+  };
+
   return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <h3>NCBA Collections</h3>
-        <div className="user-info">
-          <span className="user-role">{user?.role || 'Staff'}</span>
-          <span className="user-name">{user?.name || user?.email}</span>
-          <button onClick={onLogout} className="logout-btn">
-            Logout
-          </button>
+    <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+      {/* Logo Section */}
+      <div className="sidebar-logo">
+        <div className="logo-icon" style={{ backgroundColor: colors.accent }}>
+          <span className="logo-text">N</span>
         </div>
+        {!collapsed && (
+          <div className="logo-text-container">
+            <h3 style={{ color: colors.sidebarText }}>NCBA Kollect</h3>
+            <p className="logo-subtitle" style={{ color: colors.accent }}>Loan Repayment System</p>
+          </div>
+        )}
+        <button 
+          className="collapse-btn"
+          onClick={handleCollapse}
+          style={{ color: colors.sidebarText }}
+        >
+          {collapsed ? '›' : '‹'}
+        </button>
       </div>
 
-      <div className="sidebar-menu">
-        {menuItems.map((section, index) => (
-          <div key={index} className="menu-section">
-            <h4>{section.title}</h4>
-            <ul>
-              {section.items.map((item, itemIndex) => (
-                <li key={itemIndex}>
-                  <NavLink
-                    to={item.path}
-                    className={({ isActive }) => (isActive ? 'active' : '')}
-                  >
-                    <span className="menu-icon">{item.icon}</span>
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+      {/* Menu Items */}
+      <nav className="sidebar-nav">
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path || 
+                          location.pathname.startsWith(item.path + '/');
+          return (
+            <button
+              key={item.id}
+              className={`nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => navigate(item.path)}
+              style={{
+                backgroundColor: isActive ? colors.accent + '20' : 'transparent',
+                color: isActive ? colors.accent : colors.sidebarText
+              }}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {!collapsed && <span className="nav-label">{item.label}</span>}
+            </button>
+          );
+        })}
+      </nav>
 
-        <div className="system-status">
-          <h4>System Status</h4>
-          <div className="status-indicator active">
-            <span className="status-dot"></span>
-            Backend Connected
-          </div>
+      {/* Footer - Simplified */}
+      <div className="sidebar-footer">
+        <div className="system-info">
+          <p style={{ color: colors.sidebarText, opacity: 0.7, fontSize: '12px' }}>
+            {!collapsed && 'Version 1.0.0'}
+            {collapsed && 'V1.0'}
+          </p>
         </div>
       </div>
     </div>

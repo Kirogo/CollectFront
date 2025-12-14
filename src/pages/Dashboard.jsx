@@ -23,6 +23,7 @@ import {
   Error as ErrorIcon
 } from '@mui/icons-material';
 import api from '../services/api'; // Import the shared instance
+import Sidebar from '../components/layout/Sidebar';
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -210,7 +211,7 @@ const Dashboard = () => {
             startIcon={<Refresh />}
             onClick={fetchDashboardData}
           >
-            Refresh
+            Update Dashboard
           </Button>
         </Box>
         <Typography variant="body1" sx={{ color: colors.textSecondary }}>
@@ -247,14 +248,6 @@ const Dashboard = () => {
                     <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                       {card.subtitle}
                     </Typography>
-                  </Box>
-                  <Box sx={{ 
-                    backgroundColor: 'white', 
-                    p: 1.5, 
-                    borderRadius: 2,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                  }}>
-                    {card.icon}
                   </Box>
                 </Box>
               </CardContent>

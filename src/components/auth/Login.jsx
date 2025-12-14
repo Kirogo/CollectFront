@@ -15,8 +15,8 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
 
   // Auto-fill test credentials for easier testing
   const useTestCredentials = () => {
-    setUsername('staff');
-    setPassword('password123');
+    setUsername('samuel.kirogo');
+    setPassword('pass1234');
   };
 
   return (
