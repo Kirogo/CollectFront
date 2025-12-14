@@ -1,16 +1,18 @@
 // src/services/api.js
 import axios from 'axios';
 
-// Create axios instance with base configuration
-const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+const API_URL = 'http://localhost:5000/api';
+
+// Create axios instance with base URL
+const authAxios = axios.create({
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
+// Request interceptor to add token
+authAxios.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -18,14 +20,12 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response.data,
+// Response interceptor to handle errors
+authAxios.interceptors.response.use(
+  (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
@@ -33,17 +33,10 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    
-    const errorMessage = error.response?.data?.message || 
-                        error.message || 
-                        'An error occurred';
-    
-    return Promise.reject({
-      message: errorMessage,
-      status: error.response?.status,
-      data: error.response?.data
-    });
+    return Promise.reject(error);
   }
 );
 
-export default api;
+// Export BOTH default and named exports
+export { authAxios }; // Named export
+export default authAxios; // Default export

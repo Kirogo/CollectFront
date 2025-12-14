@@ -1,37 +1,38 @@
 // src/services/auth.service.js
-import api from './api';
+import api from './api'; // This imports the default export
 
 const authService = {
   // Login staff member - supports both username or email
-login: async (identifier, password) => {
-  try {
-    console.log('Login attempt with identifier:', identifier);
-    
-    // Determine if it's an email
-    const isEmail = identifier.includes('@');
-    const loginData = {
-      [isEmail ? 'email' : 'username']: identifier,
-      password,
-    };
-    
-    console.log('Sending to backend:', loginData);
-    
-    const response = await api.post('/auth/login', loginData);
+  login: async (identifier, password) => {
+    try {
+      console.log('Login attempt with identifier:', identifier);
       
-      console.log('Backend response:', response);
+      // Determine if it's an email
+      const isEmail = identifier.includes('@');
+      const loginData = {
+        [isEmail ? 'email' : 'username']: identifier,
+        password,
+      };
       
-      if (response.success && response.token) {
+      console.log('Sending to backend:', loginData);
+      
+      const response = await api.post('/auth/login', loginData);
+        
+      console.log('Backend response:', response.data); // Changed from response to response.data
+      
+      // Check the response structure
+      if (response.data.success && response.data.token) {
         // Store token and user data
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         console.log('Login successful, token saved');
-        return { success: true, data: response };
+        return { success: true, data: response.data };
       }
       
-      console.log('Login failed:', response.message);
+      console.log('Login failed:', response.data.message);
       return { 
         success: false, 
-        message: response.message || 'Login failed. Check your credentials.' 
+        message: response.data.message || 'Login failed. Check your credentials.' 
       };
     } catch (error) {
       console.error('Login API error:', error);
@@ -41,9 +42,9 @@ login: async (identifier, password) => {
       
       if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
         errorMessage = 'Cannot connect to server. Make sure backend is running on port 5000.';
-      } else if (error.status === 401) {
+      } else if (error.response?.status === 401) {
         errorMessage = 'Invalid username or password.';
-      } else if (error.status === 404) {
+      } else if (error.response?.status === 404) {
         errorMessage = 'Login endpoint not found. Check backend routes.';
       }
       

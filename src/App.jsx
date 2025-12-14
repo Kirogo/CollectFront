@@ -17,12 +17,12 @@ const ProtectedRoute = ({ children }) => {
 
   const isAuthenticated = authService.isAuthenticated();
   console.log('ProtectedRoute - isAuthenticated:', isAuthenticated);
-  
+
   if (!isAuthenticated) {
     console.log('Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
-  
+
   console.log('Authenticated, rendering protected content');
   return children;
 };
@@ -46,14 +46,11 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

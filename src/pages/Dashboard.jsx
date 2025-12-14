@@ -1,245 +1,327 @@
 // src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Sidebar from '../components/layout/Sidebar';
-import Header from '../components/layout/Header';
-import CustomerList from '../components/Customers/CustomerList';
-import STKPushForm from '../components/Payments/STKPushForm';
-import authService from '../services/auth.service';
-import customerService from '../services/customer.service';
-import stkService from '../services/stk.service';
-import { SAMPLE_CUSTOMERS } from '../utils/constants';
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  Card,
+  CardContent,
+  LinearProgress,
+  Button,
+  Alert,
+  AlertTitle,
+  useTheme,
+  useMediaQuery
+} from '@mui/material';
+import {
+  AccountBalanceWallet,
+  People,
+  AttachMoney,
+  Receipt,
+  Refresh,
+  Error as ErrorIcon
+} from '@mui/icons-material';
+import api from '../services/api'; // Import the shared instance
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [customers, setCustomers] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [stkStatus, setStkStatus] = useState(null);
-  const [processingPayment, setProcessingPayment] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Colors matching your login page
+  const colors = {
+    primary: '#5c4730',
+    secondary: '#3c2a1c',
+    accent: '#d4a762',
+    success: '#27ae60',
+    warning: '#f39c12',
+    danger: '#c0392b',
+    background: '#f8f9fa',
+    card: '#FFFFFF',
+    textPrimary: '#5c4730',
+    textSecondary: '#666666',
+    border: '#e8e8e8'
+  };
+
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching dashboard data...');
+      
+      const response = await api.get('/customers/dashboard/stats'); // Use the shared instance
+      console.log('Response:', response);
+      
+      if (response.data.success) {
+        setStats(response.data.data.stats);
+      } else {
+        setError('Failed to load dashboard data: ' + (response.data.message || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Dashboard fetch error:', error);
+      
+      if (error.response) {
+        if (error.response.status === 401) {
+          setError('Session expired. Please login again.');
+        } else if (error.response.status === 404) {
+          setError('Dashboard endpoint not found. Check backend routes.');
+        } else {
+          setError(`Server error: ${error.response.status}`);
+        }
+      } else if (error.request) {
+        setError('Cannot connect to server. Make sure backend is running on port 5000.');
+      } else {
+        setError('Error: ' + error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (!currentUser) {
-      navigate('/login');
-      return;
-    }
-    
-    setUser(currentUser);
-    loadCustomers();
-  }, [navigate]);
+    fetchDashboardData();
+  }, []);
 
-  const loadCustomers = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const result = await customerService.getAllCustomers();
-      
-      if (result.success) {
-        setCustomers(result.data.length > 0 ? result.data : SAMPLE_CUSTOMERS);
-      } else {
-        setError(result.message || 'Failed to load customers');
-        setCustomers(SAMPLE_CUSTOMERS); // Fallback to sample data
-      }
-    } catch (err) {
-      setError('Connection error. Using sample data.');
-      setCustomers(SAMPLE_CUSTOMERS); // Fallback to sample data
-      console.error('Error loading customers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ... rest of your Dashboard component remains the same
+  // Keep everything from the if (error) block to the end
 
-  const handleSearch = async (query) => {
-    if (!query.trim()) {
-      loadCustomers();
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const result = await customerService.searchCustomers(query);
-      
-      if (result.success) {
-        setCustomers(result.data);
-      } else {
-        setError(result.message || 'Search failed');
-      }
-    } catch (err) {
-      setError('Search error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInitiatePayment = async (paymentData) => {
-    setProcessingPayment(true);
-    setError('');
-    setStkStatus({ status: 'initiating', message: 'Initiating STK Push...' });
-    
-    try {
-      const result = await stkService.initiateSTKPush(paymentData);
-      
-      if (result.success) {
-        setStkStatus({
-          status: 'pending',
-          message: 'STK Push sent! Ask customer to check their phone and enter MPesa PIN',
-          checkoutId: result.checkoutId,
-        });
-        
-        // Start polling for status
-        if (result.checkoutId) {
-          pollPaymentStatus(result.checkoutId);
-        }
-      } else {
-        setStkStatus({ status: 'failed', message: result.message });
-        setError(result.message);
-      }
-    } catch (err) {
-      const errorMsg = 'Failed to initiate payment. Please try again.';
-      setStkStatus({ status: 'failed', message: errorMsg });
-      setError(errorMsg);
-      console.error('Payment error:', err);
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
-  const pollPaymentStatus = async (transactionId) => {
-    let attempts = 0;
-    const maxAttempts = 20;
-    
-    const checkStatus = async () => {
-      if (attempts >= maxAttempts) {
-        setStkStatus({
-          status: 'timeout',
-          message: 'Payment status check timeout. Please verify manually.',
-        });
-        return;
-      }
-      
-      attempts++;
-      
-      try {
-        const result = await stkService.checkSTKStatus(transactionId);
-        
-        if (result.success) {
-          const status = result.data.transaction?.status || result.data.status;
-          
-          if (status === 'completed' || status === 'success') {
-            setStkStatus({
-              status: 'completed',
-              message: '✅ Payment successful! Loan has been updated.',
-            });
-            
-            // Refresh customer data
-            await loadCustomers();
-            
-            // Reset after successful payment
-            setTimeout(() => {
-              setSelectedCustomer(null);
-              setStkStatus(null);
-            }, 3000);
-          } else if (status === 'failed' || status === 'cancelled') {
-            setStkStatus({
-              status: 'failed',
-              message: `Payment ${status}. Please try again.`,
-            });
-          } else {
-            // Still pending, check again
-            setTimeout(checkStatus, 3000);
-          }
-        }
-      } catch (err) {
-        console.error('Status check error:', err);
-        setTimeout(checkStatus, 3000);
-      }
-    };
-    
-    setTimeout(checkStatus, 3000);
-  };
-
-  const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
-  };
-
-  if (!user) {
-    return null;
+  if (error) {
+    return (
+      <Box sx={{ 
+        p: 4, 
+        backgroundColor: colors.background, 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <Alert 
+          severity="error" 
+          sx={{ 
+            maxWidth: 600,
+            width: '100%',
+            backgroundColor: '#fff5f5',
+            border: '1px solid #ffcccc'
+          }}
+        >
+          <AlertTitle>Dashboard Error</AlertTitle>
+          <Typography variant="body1" sx={{ mb: 2 }}>{error}</Typography>
+          <Button
+            variant="contained"
+            startIcon={<Refresh />}
+            onClick={fetchDashboardData}
+            sx={{ mt: 2 }}
+          >
+            Retry
+          </Button>
+        </Alert>
+      </Box>
+    );
   }
 
+  if (loading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: colors.background
+      }}>
+        <LinearProgress sx={{ width: '50%', mb: 3 }} />
+        <Typography variant="h6" sx={{ color: colors.textPrimary }}>
+          Loading dashboard...
+        </Typography>
+      </Box>
+    );
+  }
+
+  const displayStats = stats || {
+    totalCustomers: 0,
+    activeCustomers: 0,
+    totalLoanPortfolio: 0,
+    totalArrears: 0,
+    totalRepayments: 0,
+    totalTransactions: 0,
+    successfulTransactions: 0,
+    totalAmountCollected: 0
+  };
+
+  const statCards = [
+    {
+      title: 'Total Customers',
+      value: displayStats.totalCustomers.toLocaleString(),
+      icon: <People sx={{ fontSize: 32, color: colors.primary }} />,
+      subtitle: `Active: ${displayStats.activeCustomers.toLocaleString()}`,
+      color: colors.primary,
+      bgcolor: '#F5F0EA'
+    },
+    {
+      title: 'Loan Portfolio',
+      value: `KES ${displayStats.totalLoanPortfolio.toLocaleString()}`,
+      icon: <AccountBalanceWallet sx={{ fontSize: 32, color: colors.secondary }} />,
+      subtitle: 'Total outstanding',
+      color: colors.secondary,
+      bgcolor: '#F2EDE9'
+    },
+    {
+      title: 'Total Collections',
+      value: `KES ${displayStats.totalAmountCollected.toLocaleString()}`,
+      icon: <AttachMoney sx={{ fontSize: 32, color: colors.accent }} />,
+      subtitle: 'Amount collected',
+      color: colors.accent,
+      bgcolor: '#FAF6F0'
+    },
+    {
+      title: 'Total Arrears',
+      value: `KES ${displayStats.totalArrears.toLocaleString()}`,
+      icon: <Receipt sx={{ fontSize: 32, color: colors.warning }} />,
+      subtitle: 'Pending collections',
+      color: colors.warning,
+      bgcolor: '#FEF9E7'
+    }
+  ];
+
   return (
-    <div className="app-container">
-      <Sidebar user={user} onLogout={handleLogout} />
-      
-      <div className="main-content">
-        <Header
-          title="STK Push Loan Repayment"
-          subtitle="Initiate MPesa payment requests directly to customers"
-          onSearch={handleSearch}
-          searchPlaceholder="Search by name, phone, or account..."
-        />
-        
-        {error && !stkStatus && (
-          <div className="error-banner">{error}</div>
-        )}
-        
-        {selectedCustomer ? (
-          <STKPushForm
-            customer={selectedCustomer}
-            loading={processingPayment}
-            error={error}
-            stkStatus={stkStatus}
-            onInitiatePayment={handleInitiatePayment}
-            onBack={() => {
-              setSelectedCustomer(null);
-              setStkStatus(null);
-              setError('');
+    <Box sx={{ p: isMobile ? 2 : 4, backgroundColor: colors.background, minHeight: '100vh' }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontWeight: 700, 
+              color: colors.textPrimary,
+              background: `linear-gradient(135deg, ${colors.primary}, ${colors.accent})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
             }}
-          />
-        ) : (
-          <>
-            <CustomerList
-              customers={customers}
-              loading={loading}
-              error={error}
-              onSelectCustomer={setSelectedCustomer}
-              onRetry={loadCustomers}
-            />
-            
-            {!loading && customers.length === 0 && (
-              <div className="welcome-state">
-                <div className="welcome-content">
-                  <h3>Welcome to NCBA Collections STK Push System</h3>
-                  <p>Select a customer from the list to initiate loan repayment via MPesa.</p>
-                  
-                  <div className="quick-actions">
-                    <div className="action-card">
-                      <div className="action-icon">🔍</div>
-                      <h4>Quick Search</h4>
-                      <p>Search customers by name, phone, or account number</p>
-                    </div>
-                    <div className="action-card">
-                      <div className="action-icon">📱</div>
-                      <h4>STK Push</h4>
-                      <p>Send payment requests directly to customer phones</p>
-                    </div>
-                    <div className="action-card">
-                      <div className="action-icon">💰</div>
-                      <h4>Real-time Updates</h4>
-                      <p>See loan balances update immediately after payment</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+          >
+            Collections Dashboard
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={fetchDashboardData}
+          >
+            Refresh
+          </Button>
+        </Box>
+        <Typography variant="body1" sx={{ color: colors.textSecondary }}>
+          Real-time overview of your loan collection performance
+        </Typography>
+      </Box>
+
+      {/* Stats Grid */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {statCards.map((card, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <Card 
+              sx={{ 
+                backgroundColor: card.bgcolor,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 3,
+                boxShadow: '0 4px 12px rgba(92, 71, 48, 0.05)',
+                transition: 'transform 0.3s',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 24px rgba(92, 71, 48, 0.1)'
+                }
+              }}
+            >
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600, mb: 1 }}>
+                      {card.title}
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: card.color, mb: 0.5 }}>
+                      {card.value}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                      {card.subtitle}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    backgroundColor: 'white', 
+                    p: 1.5, 
+                    borderRadius: 2,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                  }}>
+                    {card.icon}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Quick Stats */}
+      <Paper 
+        sx={{ 
+          p: 3, 
+          borderRadius: 3,
+          backgroundColor: colors.card,
+          border: `1px solid ${colors.border}`,
+          boxShadow: '0 4px 12px rgba(92, 71, 48, 0.05)'
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 3 }}>
+          Performance Summary
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={6} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success }}>
+                {displayStats.successfulTransactions}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                Successful Transactions
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.primary }}>
+                {displayStats.totalTransactions}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                Total Transactions
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.accent }}>
+                KES {displayStats.totalRepayments.toLocaleString()}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                Total Repayments
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Box sx={{ textAlign: 'center', p: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.secondary }}>
+                {displayStats.totalTransactions > 0 
+                  ? `${((displayStats.successfulTransactions / displayStats.totalTransactions) * 100).toFixed(1)}%` 
+                  : '0%'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                Success Rate
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+    </Box>
   );
 };
 
