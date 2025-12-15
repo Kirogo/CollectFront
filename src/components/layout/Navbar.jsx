@@ -39,9 +39,9 @@ const Navbar = ({ title, onMenuToggle }) => {
         <div className="page-title">
           <h2>{pageTitle}</h2>
           <p className="page-subtitle">
-            {user?.role === 'ADMIN' ? 'Administrator' : 
-             user?.role === 'SUPERVISOR' ? 'Supervisor' : 
-             'Agent'}
+            {user?.role === 'ADMIN' ? '' : 
+             user?.role === 'SUPERVISOR' ? '' : 
+             ''}
           </p>
         </div>
       </div>

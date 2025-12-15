@@ -1,8 +1,12 @@
-// src/App.jsx - Updated imports
+// src/App.jsx - FIXED VERSION
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
+import CustomerPage from './pages/CustomerPage';
+import CustomerDetails from './pages/CustomerDetails' // Import from actual file
+import PaymentPage from './pages/PaymentPage';
+import TransactionsPage from './pages/TransactionsPage';
 import Sidebar from './components/layout/Sidebar';
 import Navbar from './components/layout/Navbar';
 import authService from './services/auth.service';
@@ -23,18 +27,18 @@ const ProtectedLayout = ({ children }) => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar 
-        onMenuToggle={toggleSidebar} 
+      <Sidebar
+        onMenuToggle={toggleSidebar}
         user={authService.getCurrentUser()}
       />
-      <div style={{ 
-        flex: 1, 
+      <div style={{
+        flex: 1,
         marginLeft: sidebarCollapsed ? '80px' : '280px',
         transition: 'margin-left 0.3s ease'
       }}>
         <Navbar onMenuToggle={toggleSidebar} />
-        <main style={{ 
-          marginTop: '70px', 
+        <main style={{
+          marginTop: '70px',
           padding: '20px',
           minHeight: 'calc(100vh - 70px)',
           backgroundColor: '#f8f9fa'
@@ -49,59 +53,63 @@ const ProtectedLayout = ({ children }) => {
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = authService.isAuthenticated();
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <ProtectedLayout>{children}</ProtectedLayout>;
 };
 
-// Create a placeholder for CustomerPage if it doesn't exist
-const CustomerPage = () => (
-  <div style={{ padding: '20px' }}>
-    <h2>Customers</h2>
-    <p>Customer management page coming soon...</p>
-  </div>
-);
-
-// Create a placeholder for PaymentPage
-const PaymentPage = () => (
-  <div style={{ padding: '20px' }}>
-    <h2>Payments</h2>
-    <p>Payment processing page coming soon...</p>
-  </div>
-);
+// REMOVED: The local CustomerPage and PaymentPage components
+// They are now imported from their respective files
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/customers" 
+        <Route
+          path="/customers"
           element={
             <ProtectedRoute>
-              <CustomerPage /> {/* Using local component */}
+              <CustomerPage /> {/* Now uses imported component */}
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payments" 
+        <Route
+          path="/customers/:id"
           element={
             <ProtectedRoute>
-              <PaymentPage /> {/* Using local component */}
+              <CustomerDetails />
             </ProtectedRoute>
-          } 
+          }
         />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <PaymentPage /> {/* Make sure you have PaymentPage.jsx */}
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transactions"
+          element={
+            <ProtectedRoute>
+              <TransactionsPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Add other routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
