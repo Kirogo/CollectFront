@@ -1,88 +1,82 @@
-// src/services/auth.service.js
-import api from './api'; // This imports the default export
+// src/services/auth.service.js - UPDATED
+const API_URL = 'http://localhost:5000/api';
+
+const USER_KEY = 'user';
+const TOKEN_KEY = 'token';
 
 const authService = {
-  // Login staff member - supports both username or email
-  login: async (identifier, password) => {
+  async login(username, password) {
     try {
-      console.log('Login attempt with identifier:', identifier);
-      
-      // Determine if it's an email
-      const isEmail = identifier.includes('@');
-      const loginData = {
-        [isEmail ? 'email' : 'username']: identifier,
-        password,
-      };
-      
-      console.log('Sending to backend:', loginData);
-      
-      const response = await api.post('/auth/login', loginData);
-        
-      console.log('Backend response:', response.data); // Changed from response to response.data
-      
-      // Check the response structure
-      if (response.data.success && response.data.token) {
-        // Store token and user data
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('Login successful, token saved');
-        return { success: true, data: response.data };
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          message: data.message || 'Login failed',
+        };
       }
-      
-      console.log('Login failed:', response.data.message);
-      return { 
-        success: false, 
-        message: response.data.message || 'Login failed. Check your credentials.' 
+
+      const userData = {
+        ...data.data.user,
+        token: data.data.token,
+      };
+
+      // Store both user data AND token separately
+      localStorage.setItem(USER_KEY, JSON.stringify(userData));
+      localStorage.setItem(TOKEN_KEY, data.data.token); // Store token separately
+
+      return {
+        success: true,
+        message: data.message || 'Login successful',
+        data: userData,
       };
     } catch (error) {
-      console.error('Login API error:', error);
-      
-      // Handle specific error cases
-      let errorMessage = 'Login failed. Please try again.';
-      
-      if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
-        errorMessage = 'Cannot connect to server. Make sure backend is running on port 5000.';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Invalid username or password.';
-      } else if (error.response?.status === 404) {
-        errorMessage = 'Login endpoint not found. Check backend routes.';
-      }
-      
-      return { 
-        success: false, 
-        message: errorMessage,
-        details: error.message 
+      console.error('Auth login error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please try again.',
       };
     }
   },
 
-  // Logout
-  logout: () => {
-    localStorage.removeItem('token');
+  getCurrentUser() {
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      if (!raw) return null;
+
+      const user = JSON.parse(raw);
+      if (!user?.token) {
+        this.logout();
+        return null;
+      }
+
+      return user;
+    } catch {
+      this.logout();
+      return null;
+    }
+  },
+
+  getToken() {
+    // Try to get token from localStorage first, then from user object
+    return localStorage.getItem(TOKEN_KEY) || this.getCurrentUser()?.token;
+  },
+
+  isAuthenticated() {
+    return !!this.getToken();
+  },
+
+  logout() {
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('user');
-  },
-
-  // Get current user
-  getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
-
-  // Check if user is authenticated
-  isAuthenticated: () => {
-    const token = localStorage.getItem('token');
-    return !!token;
-  },
-
-  // Get auth token
-  getToken: () => {
-    return localStorage.getItem('token');
-  },
-
-  // Clear auth data
-  clearAuth: () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
   },
 };
 

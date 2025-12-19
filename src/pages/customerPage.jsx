@@ -1,48 +1,31 @@
-// src/pages/CustomerPage.jsx - COMPLETE UPDATED VERSION
+// src/pages/CustomerPage.jsx - UPDATED WITH EXPORT AND REFRESH BUTTONS
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Container,
   Typography,
-  Button,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
-  IconButton,
-  Chip,
   LinearProgress,
   Alert
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Search as SearchIcon,
-  FilterList,
-  Download,
-  Print,
   Refresh,
-  PersonAdd,
-  Phone,
-  Email,
-  AccountBalanceWallet,
-  Receipt
+  Download
 } from '@mui/icons-material';
 import CustomerTable from '../components/common/CustomerTable';
 import axios from 'axios';
+import '../styles/customerpage.css';
 
 const CustomerPage = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -53,13 +36,13 @@ const CustomerPage = () => {
     arrears: '',
     accountNumber: ''
   });
+  const [exportLoading, setExportLoading] = useState(false);
 
-  // Fetch customers and stats
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem('token');
       if (!token) {
         navigate('/login');
@@ -73,37 +56,28 @@ const CustomerPage = () => {
         }
       });
 
-      // Fetch customers
       const customersResponse = await authAxios.get('/customers');
+
       if (customersResponse.data.success) {
-        // Sort customers by createdAt date (newest first)
         const customersData = customersResponse.data.data.customers || [];
         const sortedCustomers = customersData.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0);
           const dateB = new Date(b.createdAt || 0);
-          return dateB - dateA; // Newest first
+          return dateB - dateA;
         });
         setCustomers(sortedCustomers);
-      } else {
-        setError('Failed to load customers');
-      }
-
-      // Fetch stats
-      const statsResponse = await authAxios.get('/customers/dashboard/stats');
-      if (statsResponse.data.success) {
-        setStats(statsResponse.data.data.stats);
       }
 
     } catch (error) {
       console.error('Error fetching data:', error);
-      
+
       if (error.response?.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/login');
         return;
       }
-      
+
       setError('Failed to load customer data. Please try again.');
     } finally {
       setLoading(false);
@@ -114,7 +88,6 @@ const CustomerPage = () => {
     fetchData();
   }, []);
 
-  // Handle new customer form
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewCustomer(prev => ({
@@ -148,7 +121,7 @@ const CustomerPage = () => {
           arrears: '',
           accountNumber: ''
         });
-        fetchData(); // Refresh data
+        fetchData();
       }
     } catch (error) {
       console.error('Error creating customer:', error);
@@ -156,382 +129,324 @@ const CustomerPage = () => {
     }
   };
 
-  // Table actions
-  const handleViewCustomer = (customer) => {
-    navigate(`/customers/${customer.id}`);
+  const handleExportData = async () => {
+    try {
+      setExportLoading(true);
+      
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        'http://localhost:5000/api/customers/export',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          responseType: 'blob' // Important for file downloads
+        }
+      );
+
+      // Create a download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'customers_export.csv';
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch.length === 2) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      
+      // Fallback: Create CSV from current data
+      if (customers.length > 0) {
+        exportToCSV(customers);
+      } else {
+        setError('Failed to export data. Please try again.');
+      }
+    } finally {
+      setExportLoading(false);
+    }
   };
 
-  const handleEditCustomer = (customer) => {
-    // Navigate to edit customer page
-    console.log('Edit customer:', customer);
+  const exportToCSV = (data) => {
+    // Define CSV headers
+    const headers = [
+      'Customer ID',
+      'Name',
+      'Phone Number',
+      'Email',
+      'National ID',
+      'Account Number',
+      'Loan Balance',
+      'Arrears',
+      'Status',
+      'Created At'
+    ];
+    
+    // Convert data to CSV rows
+    const rows = data.map(customer => [
+      customer.customerId || '',
+      customer.name || '',
+      customer.phoneNumber || '',
+      customer.email || '',
+      customer.nationalId || '',
+      customer.accountNumber || '',
+      parseFloat(customer.loanBalance || 0).toFixed(2),
+      parseFloat(customer.arrears || 0).toFixed(2),
+      parseFloat(customer.arrears || 0) === 0 ? 'Current' : 
+        parseFloat(customer.arrears || 0) > 1000 ? 'Delinquent' : 'Warning',
+      customer.createdAt ? new Date(customer.createdAt).toLocaleDateString() : ''
+    ]);
+    
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Create and download CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `customers_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const formatCurrency = (amount) => {
-    return `KES ${parseFloat(amount || 0).toLocaleString('en-KE')}`;
+    const numAmount = parseFloat(amount || 0);
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(numAmount);
   };
 
+  const calculateTotalPortfolio = () => {
+    return customers.reduce((sum, customer) => sum + parseFloat(customer.loanBalance || 0), 0);
+  };
+
+  const calculateTotalArrears = () => {
+    return customers.reduce((sum, customer) => sum + parseFloat(customer.arrears || 0), 0);
+  };
+
+  const getCurrentCustomers = () => {
+    return customers.filter(c => parseFloat(c.arrears || 0) === 0).length;
+  };
+
+  const getWarningCustomers = () => {
+    return customers.filter(c => parseFloat(c.arrears || 0) > 0 && parseFloat(c.arrears || 0) <= 1000).length;
+  };
+
+  const getDelinquentCustomers = () => {
+    return customers.filter(c => parseFloat(c.arrears || 0) > 1000).length;
+  };
+
+  // Stats data for the cards
+  const statsData = [
+    {
+      label: 'Total Customers',
+      value: customers.length,
+      icon: '👥',
+      iconBg: 'linear-gradient(135deg, #d4a762, #5c4730)',
+      meta: 'Active loan customers'
+    },
+    {
+      label: 'Total Portfolio',
+      value: formatCurrency(calculateTotalPortfolio()),
+      icon: '💰',
+      iconBg: 'linear-gradient(135deg, #27ae60, #219653)',
+      meta: 'Active loan amount'
+    },
+    {
+      label: 'Total Arrears',
+      value: formatCurrency(calculateTotalArrears()),
+      icon: '📈',
+      iconBg: 'linear-gradient(135deg, #f39c12, #e67e22)',
+      meta: 'Overdue payments'
+    },
+    {
+      label: 'Delinquent Accounts',
+      value: getDelinquentCustomers(),
+      icon: '⚠️',
+      iconBg: 'linear-gradient(135deg, #c0392b, #e74c3c)',
+      meta: getDelinquentCustomers() > 0 ? 'Need attention' : 'All current'
+    }
+  ];
+
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: '#5c4730' }}>
-            Customer Management
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={fetchData}
-              sx={{ 
-                borderColor: '#e8e8e8',
-                color: '#5c4730',
-                '&:hover': { borderColor: '#d4a762' }
-              }}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Download />}
-              sx={{ 
-                borderColor: '#e8e8e8',
-                color: '#5c4730',
-                '&:hover': { borderColor: '#d4a762' }
-              }}
-            >
-              Export
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenDialog(true)}
-              sx={{
-                backgroundColor: '#5c4730',
-                '&:hover': { backgroundColor: '#3c2a1c' }
-              }}
-            >
-              Add Customer
-            </Button>
-          </Box>
-        </Box>
-        <Typography variant="body1" sx={{ color: '#666' }}>
-          Manage your loan customers, view details, and track repayments
-        </Typography>
-      </Box>
+    <Box className="customer-page-wrapper">
+      {/* Header Section with Stats */}
 
-      {/* Stats Cards */}
-      {stats && (
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              backgroundColor: '#F5F0EA',
-              border: '1px solid #e8e8e8',
-              borderRadius: 3,
-              height: '100%'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <PersonAdd sx={{ color: '#5c4730', fontSize: 32 }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#5c4730' }}>
-                      {stats.totalCustomers?.toLocaleString() || customers.length}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      Total Customers
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#27ae60', fontWeight: 500 }}>
-                  Showing {customers.length} customers
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              backgroundColor: '#F2EDE9',
-              border: '1px solid #e8e8e8',
-              borderRadius: 3,
-              height: '100%'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <AccountBalanceWallet sx={{ color: '#3c2a1c', fontSize: 32 }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#3c2a1c' }}>
-                      {formatCurrency(stats.totalLoanPortfolio || customers.reduce((sum, c) => sum + parseFloat(c.loanBalance || 0), 0))}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      Loan Portfolio
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#27ae60', fontWeight: 500 }}>
-                  Average: {formatCurrency(customers.length > 0 ? customers.reduce((sum, c) => sum + parseFloat(c.loanBalance || 0), 0) / customers.length : 0)}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              backgroundColor: '#FAF6F0',
-              border: '1px solid #e8e8e8',
-              borderRadius: 3,
-              height: '100%'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <Receipt sx={{ color: '#f39c12', fontSize: 32 }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#f39c12' }}>
-                      {formatCurrency(stats.totalArrears || customers.reduce((sum, c) => sum + parseFloat(c.arrears || 0), 0))}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      Total Arrears
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#c0392b', fontWeight: 500 }}>
-                  {customers.filter(c => parseFloat(c.arrears || 0) > 0).length} customers with arrears
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ 
-              backgroundColor: '#ECFDF5',
-              border: '1px solid #e8e8e8',
-              borderRadius: 3,
-              height: '100%'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <Typography sx={{ fontSize: 32 }}>📊</Typography>
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#27ae60' }}>
-                      {customers.length > 0 ? Math.round((customers.filter(c => c.isActive).length / customers.length) * 100) : 0}%
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      Active Rate
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#27ae60', fontWeight: 500 }}>
-                  {customers.filter(c => c.isActive).length} active customers
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
-      {/* Customer Table */}
-      <Box sx={{ mb: 4 }}>
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-        
-        {loading ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <LinearProgress sx={{ mb: 2 }} />
-            <Typography>Loading customers...</Typography>
-          </Paper>
-        ) : (
-          <CustomerTable
-            customers={customers}
-            loading={false}
-            onView={handleViewCustomer}
-            onEdit={handleEditCustomer}
-          />
-        )}
-      </Box>
-
-      {/* Customer Distribution */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid #e8e8e8',
-            boxShadow: '0 4px 12px rgba(92, 71, 48, 0.05)'
-          }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#5c4730', mb: 3 }}>
-              Customer Status Distribution
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {[
-                { label: 'Current (No Arrears)', count: customers.filter(c => parseFloat(c.arrears || 0) === 0).length, color: '#27ae60', percentage: customers.length > 0 ? (customers.filter(c => parseFloat(c.arrears || 0) === 0).length / customers.length * 100).toFixed(1) : 0 },
-                { label: 'Warning (≤ KES 1,000)', count: customers.filter(c => parseFloat(c.arrears || 0) > 0 && parseFloat(c.arrears || 0) <= 1000).length, color: '#f39c12', percentage: customers.length > 0 ? (customers.filter(c => parseFloat(c.arrears || 0) > 0 && parseFloat(c.arrears || 0) <= 1000).length / customers.length * 100).toFixed(1) : 0 },
-                { label: 'Delinquent (> KES 1,000)', count: customers.filter(c => parseFloat(c.arrears || 0) > 1000).length, color: '#c0392b', percentage: customers.length > 0 ? (customers.filter(c => parseFloat(c.arrears || 0) > 1000).length / customers.length * 100).toFixed(1) : 0 }
-              ].map((item, index) => (
-                <Box key={index}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#5c4730', fontWeight: 500 }}>
-                      {item.label}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: item.color, fontWeight: 600 }}>
-                      {item.count} ({item.percentage}%)
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={parseFloat(item.percentage)} 
-                    sx={{ 
-                      height: 8, 
-                      borderRadius: 4,
-                      backgroundColor: `${item.color}20`,
-                      '& .MuiLinearProgress-bar': {
-                        backgroundColor: item.color,
-                        borderRadius: 4
-                      }
-                    }} 
-                  />
-                </Box>
-              ))}
+      {/* Main Table Section */}
+      <Box className="customer-main-content">
+        <div className="customer-content-card">
+          <div className="customer-section-header">
+            <Box>
+              <Typography className="customer-section-title">
+                ALL CUSTOMERS
+              </Typography>
             </Box>
-          </Paper>
-        </Grid>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <button
+                className="customer-action-btn"
+                onClick={fetchData}
+                disabled={loading}
+              >
+                <Refresh sx={{ fontSize: 18 }} />
+                Refresh
+              </button>
+              <button
+                className="customer-primary-btn"
+                onClick={handleExportData}
+                disabled={exportLoading}
+              >
+                <Download sx={{ fontSize: 18 }} />
+                {exportLoading ? 'Exporting...' : 'Export'}
+              </button>
+            </Box>
+          </div>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid #e8e8e8',
-            boxShadow: '0 4px 12px rgba(92, 71, 48, 0.05)'
-          }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#5c4730', mb: 3 }}>
-              Quick Actions
-            </Typography>
-            <Grid container spacing={2}>
-              {[
-                { label: 'Send Bulk SMS', icon: '📱', color: '#5c4730', onClick: () => console.log('Send SMS') },
-                { label: 'Generate Report', icon: '📊', color: '#d4a762', onClick: () => console.log('Generate Report') },
-                { label: 'Import Customers', icon: '📥', color: '#3c2a1c', onClick: () => console.log('Import Customers') },
-                { label: 'View Analytics', icon: '📈', color: '#27ae60', onClick: () => console.log('View Analytics') }
-              ].map((action, index) => (
-                <Grid item xs={6} key={index}>
-                  <Button
-                    fullWidth
-                    onClick={action.onClick}
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: '#f8f9fa',
-                      color: action.color,
-                      border: '1px solid #e8e8e8',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 1,
-                      '&:hover': {
-                        backgroundColor: '#f5f0ea',
-                        borderColor: action.color,
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                  >
-                    <span style={{ fontSize: '24px' }}>{action.icon}</span>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {action.label}
-                    </Typography>
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
-        </Grid>
-      </Grid>
+          {error && (
+            <Alert severity="error" sx={{
+              mb: 3,
+              borderRadius: '10px',
+              backgroundColor: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca'
+            }}>
+              {error}
+            </Alert>
+          )}
+
+          {loading ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <LinearProgress sx={{
+                mb: 2,
+                borderRadius: '4px',
+                backgroundColor: '#f5f0ea',
+                '& .MuiLinearProgress-bar': {
+                  backgroundColor: '#5c4730'
+                }
+              }} />
+              <Typography sx={{ color: '#666' }}>Loading customers...</Typography>
+            </Box>
+          ) : (
+            <div className="table-container-wrapper">
+              <div className="table-container">
+                <CustomerTable
+                  customers={customers}
+                  loading={false}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </Box>
 
       {/* Add Customer Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ color: '#5c4730', fontWeight: 600 }}>
-          Add New Customer
+        <DialogTitle>
+          <Typography variant="h6" sx={{ color: '#3c2a1c', fontWeight: 700 }}>
+            Add New Customer
+          </Typography>
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <Box sx={{ mt: 2 }}>
             <TextField
+              fullWidth
               label="Full Name"
               name="name"
               value={newCustomer.name}
               onChange={handleInputChange}
-              fullWidth
+              margin="normal"
               required
             />
             <TextField
+              fullWidth
               label="Phone Number"
               name="phoneNumber"
               value={newCustomer.phoneNumber}
               onChange={handleInputChange}
-              fullWidth
+              margin="normal"
               required
-              InputProps={{
-                startAdornment: <Typography sx={{ mr: 1 }}>+254</Typography>
-              }}
             />
             <TextField
-              label="Email Address"
+              fullWidth
+              label="Email"
               name="email"
-              type="email"
               value={newCustomer.email}
               onChange={handleInputChange}
-              fullWidth
+              margin="normal"
             />
             <TextField
+              fullWidth
               label="National ID"
               name="nationalId"
               value={newCustomer.nationalId}
               onChange={handleInputChange}
-              fullWidth
+              margin="normal"
             />
             <TextField
-              label="Initial Loan Balance (KES)"
-              name="loanBalance"
-              type="number"
-              value={newCustomer.loanBalance}
-              onChange={handleInputChange}
               fullWidth
-            />
-            <TextField
-              label="Initial Arrears (KES)"
-              name="arrears"
-              type="number"
-              value={newCustomer.arrears}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
               label="Account Number"
               name="accountNumber"
               value={newCustomer.accountNumber}
               onChange={handleInputChange}
+              margin="normal"
+            />
+            <TextField
               fullWidth
-              helperText="Leave blank to auto-generate"
+              label="Loan Balance"
+              name="loanBalance"
+              value={newCustomer.loanBalance}
+              onChange={handleInputChange}
+              margin="normal"
+              type="number"
+            />
+            <TextField
+              fullWidth
+              label="Arrears"
+              name="arrears"
+              value={newCustomer.arrears}
+              onChange={handleInputChange}
+              margin="normal"
+              type="number"
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 0 }}>
-          <Button onClick={() => setOpenDialog(false)} sx={{ color: '#666' }}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="contained"
-            sx={{
-              backgroundColor: '#5c4730',
-              '&:hover': { backgroundColor: '#3c2a1c' }
-            }}
+        <DialogActions>
+          <button
+            className="customer-secondary-dialog-btn"
+            onClick={() => setOpenDialog(false)}
           >
-            Add Customer
-          </Button>
+            Cancel
+          </button>
+          <button
+            className="customer-primary-dialog-btn"
+            onClick={handleSubmit}
+          >
+            Save Customer
+          </button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </Box>
   );
 };
 

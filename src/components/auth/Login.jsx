@@ -13,6 +13,16 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
     }
   };
 
+  // After successful login in your LoginPage component
+const handleLogin = async (username, password) => {
+  const result = await authService.login(username, password);
+  if (result.success) {
+    console.log('Token stored:', localStorage.getItem('token')); // Debug
+    console.log('User stored:', localStorage.getItem('user')); // Debug
+    navigate('/dashboard');
+  }
+};
+
   // Auto-fill test credentials for easier testing
   const useTestCredentials = () => {
     setUsername('samuel.kirogo');
@@ -84,7 +94,7 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
               <div className="compact-form-group">
                 <label>
                   <span className="label-icon">👤</span>
-                  Username or Email
+                  Username
                 </label>
                 <input
                   type="text"

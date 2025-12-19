@@ -1,5 +1,5 @@
-// src/components/layout/Navbar.jsx
-import React, { useState } from 'react';
+// src/components/layout/Navbar.jsx - MINIMAL VERSION
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import authService from '../../services/auth.service';
 import '../../styles/navbar.css';
@@ -9,6 +9,26 @@ const Navbar = ({ title, onMenuToggle }) => {
   const location = useLocation();
   const user = authService.getCurrentUser();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current && 
+        buttonRef.current &&
+        !dropdownRef.current.contains(event.target) && 
+        !buttonRef.current.contains(event.target)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = () => {
     authService.logout();
@@ -29,6 +49,20 @@ const Navbar = ({ title, onMenuToggle }) => {
   };
 
   const pageTitle = getPageTitle();
+
+  // Get first letter of username or name
+  const getUserInitial = () => {
+    if (user?.name) return user.name.charAt(0).toUpperCase();
+    if (user?.username) return user.username.charAt(0).toUpperCase();
+    return 'U';
+  };
+
+  // Get full username or name
+  const getUserFullName = () => {
+    if (user?.name) return user.name;
+    if (user?.username) return user.username;
+    return 'User';
+  };
 
   return (
     <nav className="navbar">
@@ -53,48 +87,44 @@ const Navbar = ({ title, onMenuToggle }) => {
           <span className="badge">3</span>
         </button>
 
-        {/* User Profile */}
+        {/* User Profile - Minimal version */}
         <div className="user-profile">
           <button 
+            ref={buttonRef}
             className="user-btn"
             onClick={() => setShowUserMenu(!showUserMenu)}
+            aria-expanded={showUserMenu}
           >
             <div className="user-avatar">
-              {user?.name?.charAt(0) || 'U'}
+              {getUserInitial()}
             </div>
-            <div className="user-info">
-              <span className="user-name">{user?.name || 'User'}</span>
-              <span className="user-role">{user?.role || 'Staff'}</span>
-            </div>
-            <span className="dropdown-icon">▼</span>
           </button>
 
           {showUserMenu && (
-            <div className="user-dropdown">
+            <div ref={dropdownRef} className="user-dropdown">
+              {/* Minimal header with only username */}
               <div className="dropdown-header">
                 <div className="dropdown-avatar">
-                  {user?.name?.charAt(0) || 'U'}
+                  {getUserInitial()}
                 </div>
-                <div>
-                  <h4>{user?.name || 'User'}</h4>
-                  <p>{user?.email || user?.username || 'user@ncbabank.co.ke'}</p>
-                  <p className="role-badge">{user?.role || 'Staff'}</p>
-                </div>
+                <h4>{getUserFullName()}</h4>
               </div>
-              <div className="dropdown-divider"></div>
-              <button className="dropdown-item">
+              
+              {/* Minimal menu items */}
+              <button className="dropdown-item" onClick={() => {
+                navigate('/profile');
+                setShowUserMenu(false);
+              }}>
                 <span className="icon">👤</span>
-                My Profile
+                Profile
               </button>
-              <button className="dropdown-item">
+              <button className="dropdown-item" onClick={() => {
+                navigate('/settings');
+                setShowUserMenu(false);
+              }}>
                 <span className="icon">⚙️</span>
                 Settings
               </button>
-              <button className="dropdown-item">
-                <span className="icon">🆘</span>
-                Help & Support
-              </button>
-              <div className="dropdown-divider"></div>
               <button className="dropdown-item logout" onClick={handleLogout}>
                 <span className="icon">🚪</span>
                 Logout

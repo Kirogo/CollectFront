@@ -1,10 +1,10 @@
-// src/App.jsx - FIXED VERSION
+// src/App.jsx - FINAL WORKING VERSION
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import CustomerPage from './pages/CustomerPage';
-import CustomerDetails from './pages/CustomerDetails' // Import from actual file
+import CustomerDetails from './pages/CustomerDetails';
 import PaymentPage from './pages/PaymentPage';
 import TransactionsPage from './pages/TransactionsPage';
 import Sidebar from './components/layout/Sidebar';
@@ -53,7 +53,7 @@ const ProtectedLayout = ({ children }) => {
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = authService.isAuthenticated();
-
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -61,14 +61,14 @@ const ProtectedRoute = ({ children }) => {
   return <ProtectedLayout>{children}</ProtectedLayout>;
 };
 
-// REMOVED: The local CustomerPage and PaymentPage components
-// They are now imported from their respective files
-
 function App() {
   return (
     <Router>
       <Routes>
+        {/* Login route */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={
@@ -81,7 +81,7 @@ function App() {
           path="/customers"
           element={
             <ProtectedRoute>
-              <CustomerPage /> {/* Now uses imported component */}
+              <CustomerPage />
             </ProtectedRoute>
           }
         />
@@ -97,7 +97,7 @@ function App() {
           path="/payments"
           element={
             <ProtectedRoute>
-              <PaymentPage /> {/* Make sure you have PaymentPage.jsx */}
+              <PaymentPage />
             </ProtectedRoute>
           }
         />
@@ -110,9 +110,15 @@ function App() {
           }
         />
 
-        {/* Add other routes */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Default route */}
+        <Route path="/" element={
+          authService.isAuthenticated() ? 
+            <Navigate to="/dashboard" replace /> : 
+            <Navigate to="/login" replace />
+        } />
+        
+        {/* Catch-all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

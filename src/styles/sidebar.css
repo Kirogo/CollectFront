@@ -1,6 +1,6 @@
-/* src/styles/sidebar.css */
+/* src/styles/sidebar.css - COMPACT VERSION */
 .sidebar {
-  width: 280px;
+  width: 240px; /* Reduced from 280px */
   height: 100vh;
   background: #5c4730;
   background: linear-gradient(145deg, #5c4730 0%, #3c2a1c 100%);
@@ -9,142 +9,132 @@
   top: 0;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow-y: auto;
 }
 
 .sidebar.collapsed {
-  width: 80px;
+  width: 65px; /* Reduced from 80px */
 }
 
-/* Logo Section */
+/* Logo Section - COMPACT */
 .sidebar-logo {
-  padding: 25px 20px;
+  padding: 20px 16px; /* Reduced padding */
   border-bottom: 1px solid rgba(212, 167, 98, 0.2);
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px; /* Reduced gap */
   position: relative;
+  min-height: 70px; /* Reduced height */
 }
 
 .logo-icon {
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
+  width: 38px; /* Reduced size */
+  height: 38px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  background: #d4a762; /* Gold accent color */
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 16px; /* Smaller font */
   font-weight: 700;
   color: #5c4730;
 }
 
 .logo-text-container h3 {
-  font-size: 20px;
+  font-size: 18px; /* Reduced from 20px */
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
+  color: white;
 }
 
 .logo-subtitle {
-  font-size: 12px;
+  font-size: 11px; /* Reduced from 12px */
   font-weight: 500;
-  margin: 3px 0 0 0;
-  opacity: 0.9;
+  margin: 2px 0 0 0; /* Reduced margin */
+  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .collapse-btn {
   position: absolute;
-  right: 15px;
+  right: 12px; /* Adjusted position */
   top: 50%;
   transform: translateY(-50%);
   background: rgba(255, 255, 255, 0.1);
   border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 22px; /* Smaller */
+  height: 22px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px; /* Smaller font */
+  color: rgba(255, 255, 255, 0.9);
   transition: all 0.3s ease;
 }
 
 .collapse-btn:hover {
   background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%) scale(1.1);
 }
 
-.user-avatar {
-  width: 45px;
-  height: 45px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 18px;
-  color: #5c4730;
-  flex-shrink: 0;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.user-info h4 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.user-role {
-  font-size: 12px;
-  font-weight: 500;
-  margin: 4px 0 0 0;
-  opacity: 0.9;
-}
-
-/* Navigation */
+/* Navigation - COMPACT */
 .sidebar-nav {
   flex: 1;
-  padding: 30px 15px; /* Increased padding */
+  padding: 20px 10px; /* Reduced padding */
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px; /* Reduced gap */
 }
 
 .nav-item {
-  padding: 14px 20px;
+  padding: 12px 16px; /* Reduced padding */
   border: none;
-  border-radius: 10px;
+  border-radius: 8px; /* Slightly smaller radius */
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px; /* Reduced gap */
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px; /* Smaller font */
   font-weight: 500;
   text-align: left;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .nav-item:hover {
   background: rgba(212, 167, 98, 0.15) !important;
-  transform: translateX(5px);
+  transform: translateX(4px); /* Slightly less movement */
+  color: white;
 }
 
 .nav-item.active {
+  background: rgba(212, 167, 98, 0.2) !important;
   border-left: 3px solid #d4a762;
+  color: white;
+  font-weight: 600;
 }
 
 .nav-icon {
-  font-size: 20px;
+  font-size: 18px; /* Slightly smaller */
   flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.nav-item.active .nav-icon {
+  opacity: 1;
 }
 
 .nav-label {
@@ -153,9 +143,9 @@
   text-overflow: ellipsis;
 }
 
-/* Footer */
+/* Footer - COMPACT */
 .sidebar-footer {
-  padding: 20px;
+  padding: 16px; /* Reduced padding */
   border-top: 1px solid rgba(212, 167, 98, 0.2);
   text-align: center;
 }
@@ -164,62 +154,47 @@
   text-align: center;
 }
 
-.logout-btn {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+.system-info p {
+  font-size: 11px; /* Smaller */
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  font-weight: 500;
 }
 
-.logout-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(192, 57, 43, 0.2);
-}
-
-.logout-icon {
-  font-size: 18px;
-}
-
-.logout-text {
-  white-space: nowrap;
-}
-
-/* Collapsed State */
+/* Collapsed State Adjustments */
 .sidebar.collapsed .logo-text-container,
-.sidebar.collapsed .user-info,
 .sidebar.collapsed .nav-label,
-.sidebar.collapsed .system-info,
-.sidebar.collapsed .logout-text {
+.sidebar.collapsed .system-info p {
   display: none;
 }
 
-.sidebar.collapsed .sidebar-logo,
-.sidebar.collapsed .sidebar-user {
+.sidebar.collapsed .sidebar-logo {
   justify-content: center;
-  padding: 25px 15px;
+  padding: 20px 12px;
 }
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: 14px;
-}
-
-.sidebar.collapsed .logout-btn {
-  justify-content: center;
   padding: 12px;
 }
 
-/* Scrollbar */
+.sidebar.collapsed .nav-item:hover {
+  transform: translateX(2px); /* Less movement when collapsed */
+}
+
+.sidebar.collapsed .collapse-btn {
+  right: 50%;
+  transform: translate(50%, -50%);
+}
+
+/* Remove scrollbar in collapsed state */
+.sidebar.collapsed::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrollbar styling for expanded state */
 .sidebar::-webkit-scrollbar {
-  width: 6px;
+  width: 5px; /* Thinner scrollbar */
 }
 
 .sidebar::-webkit-scrollbar-track {
@@ -227,10 +202,45 @@
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: rgba(212, 167, 98, 0.5);
-  border-radius: 3px;
+  background: rgba(212, 167, 98, 0.4);
+  border-radius: 2px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 167, 98, 0.7);
+  background: rgba(212, 167, 98, 0.6);
+}
+
+/* Animation for smooth transitions */
+.nav-item, .logo-text-container, .collapse-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar:not(.collapsed) {
+    width: 220px;
+  }
+  
+  .sidebar.collapsed {
+    width: 60px;
+  }
+  
+  .sidebar-logo {
+    padding: 18px 14px;
+    min-height: 65px;
+  }
+  
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .logo-text {
+    font-size: 15px;
+  }
+  
+  .nav-item {
+    padding: 11px 14px;
+    font-size: 12px;
+  }
 }

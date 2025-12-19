@@ -1,5 +1,6 @@
-// src/services/api.js
+// src/services/api.js - UPDATED
 import axios from 'axios';
+import authService from './auth.service'; // IMPORT THIS
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -14,7 +15,7 @@ const authAxios = axios.create({
 // Request interceptor to add token
 authAxios.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = authService.getToken(); // Use authService
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -29,8 +30,7 @@ authAxios.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      authService.logout();
       window.location.href = '/login';
     }
     return Promise.reject(error);
