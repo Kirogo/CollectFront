@@ -167,6 +167,28 @@ const Dashboard = () => {
     return numAmount === 0 ? "KES 0" : `KES ${numAmount.toLocaleString()}`;
   };
 
+  // Handle customer navigation - FIXED FOR MONGODB
+  const handleCustomerClick = (customer) => {
+    console.log("Customer clicked:", customer);
+    console.log("Available ID fields:", {
+      _id: customer._id,
+      customerId: customer.customerId,
+      id: customer.id
+    });
+    
+    // MongoDB uses _id, not id
+    const customerId = customer._id || customer.customerId;
+    
+    if (!customerId) {
+      console.error("No valid ID found for customer:", customer);
+      alert("Error: Could not find customer ID");
+      return;
+    }
+    
+    console.log(`Navigating to: /customers/${customerId}`);
+    navigate(`/customers/${customerId}`);
+  };
+
   return (
     <Box className="dashboard-wrapper">
       {/* Header */}
@@ -253,11 +275,12 @@ const Dashboard = () => {
                   </Button>
                 </div>
               ) : (
-                recentCustomers.map((customer) => (
+                recentCustomers.map((customer, index) => (
                   <div 
-                    key={customer.id} 
+                    key={customer._id || index} 
                     className="customer-row"
-                    onClick={() => navigate(`/customers/${customer.id}`)}
+                    onClick={() => handleCustomerClick(customer)}
+                    style={{ cursor: 'pointer' }}
                   >
                     <div className="customer-info">
                       <Typography className="customer-name">

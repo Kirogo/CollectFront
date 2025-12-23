@@ -429,6 +429,120 @@
   box-shadow: none;
 }
 
+/* Updated Comment Card - Two Sections */
+.comment-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.comment-input-section {
+  flex: 0 0 auto;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(92, 71, 48, 0.1);
+  margin-bottom: 1rem;
+}
+
+.comment-history-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.comment-history-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #5c4730;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+  opacity: 0.8;
+}
+
+.comment-history-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 200px;
+  padding-right: 0.5rem;
+}
+
+.comment-history-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.comment-history-container::-webkit-scrollbar-track {
+  background: #f5f0ea;
+  border-radius: 2px;
+}
+
+.comment-history-container::-webkit-scrollbar-thumb {
+  background: rgba(92, 71, 48, 0.2);
+  border-radius: 2px;
+}
+
+.comment-history-item {
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.5rem;
+  background: #faf6f0;
+  border: 1px solid rgba(92, 71, 48, 0.1);
+}
+
+.comment-history-item:last-child {
+  margin-bottom: 0;
+}
+
+.comment-history-content {
+  font-size: 0.8125rem;
+  color: #3c2a1c;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-history-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.6875rem;
+}
+
+.comment-history-author {
+  font-weight: 600;
+  color: #5c4730;
+}
+
+.comment-history-date {
+  color: #666;
+  font-style: italic;
+}
+
+.no-comments {
+  text-align: center;
+  padding: 1.5rem;
+  color: #666;
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+/* Updated comment textarea height */
+.comment-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid rgba(92, 71, 48, 0.2);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  background: white;
+  transition: all 0.3s ease;
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
 /* Transactions Card - 65% width */
 .transactions-card {
   height: 100%;
@@ -972,6 +1086,92 @@
   border-radius: 0.5rem;
   border-left: 3px solid #007C00;
   line-height: 1.5;
+}
+
+/* Add to CustomerDetails.css */
+
+/* Comment loading indicator */
+.loading-indicator {
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+  font-style: italic;
+}
+
+/* Local comment badge */
+.local-comment-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ffeb3b;
+  color: #333;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Loading comments state */
+.loading-comments {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+/* No comments state */
+.no-comments {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.no-comments-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.no-comments-text {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Comment history item improvements */
+.comment-history-item {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.comment-history-item:hover {
+  background-color: #f9f9f9;
+}
+
+.comment-history-content {
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-history-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #666;
+}
+
+.comment-history-author {
+  font-weight: 600;
+  color: #5c4730;
+}
+
+.comment-history-date {
+  color: #888;
 }
 
 /* Responsive Design */

@@ -1,4 +1,4 @@
-// src/pages/CustomerPage.jsx - UPDATED WITH EXPORT AND REFRESH BUTTONS
+// src/pages/CustomerPage.jsx - UPDATED WITH MONGODB FIXES
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -37,6 +37,12 @@ const CustomerPage = () => {
     accountNumber: ''
   });
   const [exportLoading, setExportLoading] = useState(false);
+  const [stats, setStats] = useState({
+    totalCustomers: 0,
+    totalLoanBalance: 0,
+    totalArrears: 0,
+    activeCustomers: 0
+  });
 
   const fetchData = async () => {
     try {
@@ -56,9 +62,11 @@ const CustomerPage = () => {
         }
       });
 
-      const customersResponse = await authAxios.get('/customers');
-
+      // Fetch customers
+      const customersResponse = await authAxios.get('/customers?limit=100');
+      
       if (customersResponse.data.success) {
+        // MongoDB returns data in data.customers
         const customersData = customersResponse.data.data.customers || [];
         const sortedCustomers = customersData.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0);
@@ -66,6 +74,16 @@ const CustomerPage = () => {
           return dateB - dateA;
         });
         setCustomers(sortedCustomers);
+        
+        // Calculate stats from response
+        if (customersResponse.data.data.summary) {
+          setStats({
+            totalCustomers: customersResponse.data.data.summary.totalCustomers || 0,
+            totalLoanBalance: customersResponse.data.data.summary.totalLoanBalance || 0,
+            totalArrears: customersResponse.data.data.summary.totalArrears || 0,
+            activeCustomers: customersResponse.data.data.summary.activeCustomers || 0
+          });
+        }
       }
 
     } catch (error) {
@@ -78,7 +96,7 @@ const CustomerPage = () => {
         return;
       }
 
-      setError('Failed to load customer data. Please try again.');
+      setError(error.response?.data?.message || 'Failed to load customer data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -101,7 +119,11 @@ const CustomerPage = () => {
       const token = localStorage.getItem('token');
       const response = await axios.post(
         'http://localhost:5000/api/customers',
-        newCustomer,
+        {
+          ...newCustomer,
+          loanBalance: parseFloat(newCustomer.loanBalance) || 0,
+          arrears: parseFloat(newCustomer.arrears) || 0
+        },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -121,11 +143,13 @@ const CustomerPage = () => {
           arrears: '',
           accountNumber: ''
         });
-        fetchData();
+        fetchData(); // Refresh the list
+      } else {
+        setError(response.data.message || 'Failed to create customer');
       }
     } catch (error) {
       console.error('Error creating customer:', error);
-      setError('Failed to create customer. Please try again.');
+      setError(error.response?.data?.message || 'Failed to create customer. Please try again.');
     }
   };
 
@@ -141,7 +165,7 @@ const CustomerPage = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          responseType: 'blob' // Important for file downloads
+          responseType: 'blob'
         }
       );
 
@@ -150,13 +174,13 @@ const CustomerPage = () => {
       const link = document.createElement('a');
       link.href = url;
       
-      // Get filename from Content-Disposition header or use default
+      // Get filename from headers or use default
       const contentDisposition = response.headers['content-disposition'];
       let filename = 'customers_export.csv';
       
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch.length === 2) {
+        if (filenameMatch && filenameMatch.length === 2) {
           filename = filenameMatch[1];
         }
       }
@@ -239,11 +263,11 @@ const CustomerPage = () => {
   };
 
   const calculateTotalPortfolio = () => {
-    return customers.reduce((sum, customer) => sum + parseFloat(customer.loanBalance || 0), 0);
+    return stats.totalLoanBalance || customers.reduce((sum, customer) => sum + parseFloat(customer.loanBalance || 0), 0);
   };
 
   const calculateTotalArrears = () => {
-    return customers.reduce((sum, customer) => sum + parseFloat(customer.arrears || 0), 0);
+    return stats.totalArrears || customers.reduce((sum, customer) => sum + parseFloat(customer.arrears || 0), 0);
   };
 
   const getCurrentCustomers = () => {
@@ -258,11 +282,11 @@ const CustomerPage = () => {
     return customers.filter(c => parseFloat(c.arrears || 0) > 1000).length;
   };
 
-  // Stats data for the cards
+  // Stats data for the cards - FIXED to use MongoDB data
   const statsData = [
     {
       label: 'Total Customers',
-      value: customers.length,
+      value: stats.totalCustomers || customers.length,
       icon: '👥',
       iconBg: 'linear-gradient(135deg, #d4a762, #5c4730)',
       meta: 'Active loan customers'
@@ -292,7 +316,6 @@ const CustomerPage = () => {
 
   return (
     <Box className="customer-page-wrapper">
-      {/* Header Section with Stats */}
 
       {/* Main Table Section */}
       <Box className="customer-main-content">
@@ -300,7 +323,7 @@ const CustomerPage = () => {
           <div className="customer-section-header">
             <Box>
               <Typography className="customer-section-title">
-                ALL CUSTOMERS
+                ALL CUSTOMERS ({customers.length})
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -353,6 +376,7 @@ const CustomerPage = () => {
                 <CustomerTable
                   customers={customers}
                   loading={false}
+                  onRefresh={fetchData}
                 />
               </div>
             </div>
@@ -371,21 +395,26 @@ const CustomerPage = () => {
           <Box sx={{ mt: 2 }}>
             <TextField
               fullWidth
-              label="Full Name"
+              label="Full Name *"
               name="name"
               value={newCustomer.name}
               onChange={handleInputChange}
               margin="normal"
               required
+              error={!newCustomer.name}
+              helperText={!newCustomer.name ? "Required field" : ""}
             />
             <TextField
               fullWidth
-              label="Phone Number"
+              label="Phone Number *"
               name="phoneNumber"
               value={newCustomer.phoneNumber}
               onChange={handleInputChange}
               margin="normal"
               required
+              error={!newCustomer.phoneNumber}
+              helperText={!newCustomer.phoneNumber ? "Required field (254XXXXXXXXX)" : ""}
+              placeholder="254712345678"
             />
             <TextField
               fullWidth
@@ -419,6 +448,7 @@ const CustomerPage = () => {
               onChange={handleInputChange}
               margin="normal"
               type="number"
+              InputProps={{ inputProps: { min: 0 } }}
             />
             <TextField
               fullWidth
@@ -428,6 +458,7 @@ const CustomerPage = () => {
               onChange={handleInputChange}
               margin="normal"
               type="number"
+              InputProps={{ inputProps: { min: 0 } }}
             />
           </Box>
         </DialogContent>
@@ -441,6 +472,7 @@ const CustomerPage = () => {
           <button
             className="customer-primary-dialog-btn"
             onClick={handleSubmit}
+            disabled={!newCustomer.name || !newCustomer.phoneNumber}
           >
             Save Customer
           </button>

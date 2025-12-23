@@ -1,4 +1,4 @@
-// src/components/common/CustomerTable.jsx - MINIMAL AND CENTERED
+// src/components/common/CustomerTable.jsx - FIXED
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -72,7 +72,21 @@ const CustomerTable = ({ customers = [], loading = false }) => {
   };
 
   const handleViewCustomer = (customer) => {
-    navigate(`/customers/${customer.id}`);
+    console.log('👁️ Viewing customer:', customer);
+    console.log('Customer _id:', customer._id);
+    console.log('Customer customerId:', customer.customerId);
+    console.log('Customer id (legacy):', customer.id);
+    
+    // FIX: Use customer._id (MongoDB) instead of customer.id (JSON)
+    const customerId = customer._id || customer.customerId || customer.id;
+    console.log('Navigating with ID:', customerId);
+    
+    if (customerId) {
+      navigate(`/customers/${customerId}`);
+    } else {
+      console.error('❌ No valid customer ID found:', customer);
+      alert('Error: Customer ID not found');
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -184,7 +198,7 @@ const CustomerTable = ({ customers = [], loading = false }) => {
             ) : (
               paginatedCustomers.map((customer) => (
                 <TableRow 
-                  key={customer.id}
+                  key={customer._id || customer.id} // FIX: Use _id or id
                   hover
                   sx={{ 
                     '&:hover': { backgroundColor: '#faf6f0' },

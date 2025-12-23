@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import CustomerPage from './pages/CustomerPage';
+import ReportsPage from './pages/ReportsPage';
 import CustomerDetails from './pages/CustomerDetails';
 import PaymentPage from './pages/PaymentPage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -119,6 +120,7 @@ function App() {
         
         {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/reports" element={<ReportsPage />} />
       </Routes>
     </Router>
   );
