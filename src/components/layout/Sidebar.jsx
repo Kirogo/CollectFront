@@ -1,6 +1,15 @@
-// src/components/layout/Sidebar.jsx - COMPACT VERSION
+// src/components/layout/Sidebar.jsx - WITH MATERIAL UI ICONS
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Home as HomeIcon,
+  People as PeopleIcon,
+  BarChart as BarChartIcon,
+  Settings as SettingsIcon,
+  CompareArrows as CompareArrowsIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon
+} from '@mui/icons-material';
 import '../../styles/sidebar.css';
 
 const Sidebar = ({ onMenuToggle }) => {
@@ -12,31 +21,31 @@ const Sidebar = ({ onMenuToggle }) => {
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: '📊',
+      icon: <HomeIcon fontSize="small" />,
       path: '/dashboard'
     },
     {
       id: 'customers',
       label: 'Customers',
-      icon: '👥',
+      icon: <PeopleIcon fontSize="small" />,
       path: '/customers'
     },
     {
       id: 'transactions',
       label: 'Transactions',
-      icon: '📝',
+      icon: <CompareArrowsIcon fontSize="small" />,
       path: '/transactions'
     },
     {
       id: 'reports',
       label: 'Reports',
-      icon: '📈',
+      icon: <BarChartIcon fontSize="small" />,
       path: '/reports'
     },
     {
       id: 'settings',
       label: 'Settings',
-      icon: '⚙️',
+      icon: <SettingsIcon fontSize="small" />,
       path: '/settings'
     }
   ];
@@ -63,7 +72,7 @@ const Sidebar = ({ onMenuToggle }) => {
           className="collapse-btn"
           onClick={handleCollapse}
         >
-          {collapsed ? '›' : '‹'}
+          {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
         </button>
       </div>
 
@@ -78,7 +87,7 @@ const Sidebar = ({ onMenuToggle }) => {
               className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={() => navigate(item.path)}
             >
-              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-icon mui-icon">{item.icon}</span>
               {!collapsed && <span className="nav-label">{item.label}</span>}
             </button>
           );

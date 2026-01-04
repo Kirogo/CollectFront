@@ -1,6 +1,8 @@
-/* src/styles/sidebar.css - COMPACT VERSION */
+/* src/styles/sidebar.css - WITH MATERIAL UI ICONS */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+
 .sidebar {
-  width: 240px; /* Reduced from 280px */
+  width: 240px;
   height: 100vh;
   background: #5c4730;
   background: linear-gradient(145deg, #5c4730 0%, #3c2a1c 100%);
@@ -13,25 +15,26 @@
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow-y: auto;
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
 }
 
 .sidebar.collapsed {
-  width: 65px; /* Reduced from 80px */
+  width: 65px;
 }
 
 /* Logo Section - COMPACT */
 .sidebar-logo {
-  padding: 20px 16px; /* Reduced padding */
+  padding: 20px 16px;
   border-bottom: 1px solid rgba(212, 167, 98, 0.2);
   display: flex;
   align-items: center;
-  gap: 12px; /* Reduced gap */
+  gap: 12px;
   position: relative;
-  min-height: 70px; /* Reduced height */
+  min-height: 70px;
 }
 
 .logo-icon {
-  width: 38px; /* Reduced size */
+  width: 38px;
   height: 38px;
   border-radius: 10px;
   display: flex;
@@ -43,13 +46,13 @@
 }
 
 .logo-text {
-  font-size: 16px; /* Smaller font */
+  font-size: 16px;
   font-weight: 700;
   color: #5c4730;
 }
 
 .logo-text-container h3 {
-  font-size: 18px; /* Reduced from 20px */
+  font-size: 18px;
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.2px;
@@ -57,30 +60,30 @@
 }
 
 .logo-subtitle {
-  font-size: 11px; /* Reduced from 12px */
+  font-size: 11px;
   font-weight: 500;
-  margin: 2px 0 0 0; /* Reduced margin */
+  margin: 2px 0 0 0;
   opacity: 0.8;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .collapse-btn {
   position: absolute;
-  right: 12px; /* Adjusted position */
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   background: rgba(255, 255, 255, 0.1);
   border: none;
-  width: 22px; /* Smaller */
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 14px; /* Smaller font */
   color: rgba(255, 255, 255, 0.9);
   transition: all 0.3s ease;
+  padding: 0;
 }
 
 .collapse-btn:hover {
@@ -91,23 +94,23 @@
 /* Navigation - COMPACT */
 .sidebar-nav {
   flex: 1;
-  padding: 20px 10px; /* Reduced padding */
+  padding: 20px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px; /* Reduced gap */
+  gap: 6px;
 }
 
 .nav-item {
-  padding: 12px 16px; /* Reduced padding */
+  padding: 12px 16px;
   border: none;
-  border-radius: 8px; /* Slightly smaller radius */
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 12px; /* Reduced gap */
+  gap: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: inherit;
-  font-size: 13px; /* Smaller font */
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
   background: transparent;
@@ -116,7 +119,7 @@
 
 .nav-item:hover {
   background: rgba(212, 167, 98, 0.15) !important;
-  transform: translateX(4px); /* Slightly less movement */
+  transform: translateX(4px);
   color: white;
 }
 
@@ -127,14 +130,27 @@
   font-weight: 600;
 }
 
-.nav-icon {
-  font-size: 18px; /* Slightly smaller */
+/* Material UI Icon Styling */
+.nav-icon.mui-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   opacity: 0.9;
+  font-size: 20px !important;
 }
 
-.nav-item.active .nav-icon {
+.nav-icon.mui-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.nav-item.active .nav-icon.mui-icon {
   opacity: 1;
+  color: #d4a762;
 }
 
 .nav-label {
@@ -145,7 +161,7 @@
 
 /* Footer - COMPACT */
 .sidebar-footer {
-  padding: 16px; /* Reduced padding */
+  padding: 16px;
   border-top: 1px solid rgba(212, 167, 98, 0.2);
   text-align: center;
 }
@@ -155,7 +171,7 @@
 }
 
 .system-info p {
-  font-size: 11px; /* Smaller */
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
   font-weight: 500;
@@ -179,12 +195,18 @@
 }
 
 .sidebar.collapsed .nav-item:hover {
-  transform: translateX(2px); /* Less movement when collapsed */
+  transform: translateX(2px);
 }
 
 .sidebar.collapsed .collapse-btn {
   right: 50%;
   transform: translate(50%, -50%);
+}
+
+/* Collapsed state icon centering */
+.sidebar.collapsed .nav-icon.mui-icon {
+  margin: 0;
+  justify-content: center;
 }
 
 /* Remove scrollbar in collapsed state */
@@ -194,7 +216,7 @@
 
 /* Scrollbar styling for expanded state */
 .sidebar::-webkit-scrollbar {
-  width: 5px; /* Thinner scrollbar */
+  width: 5px;
 }
 
 .sidebar::-webkit-scrollbar-track {
@@ -243,4 +265,24 @@
     padding: 11px 14px;
     font-size: 12px;
   }
+  
+  .nav-icon.mui-icon {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .nav-icon.mui-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* Hover effects for Material UI icons */
+.nav-item:hover .nav-icon.mui-icon {
+  color: #d4a762;
+  transform: scale(1.1);
+}
+
+.nav-item.active:hover .nav-icon.mui-icon {
+  color: #ffd700; /* Brighter gold for active hover */
 }
