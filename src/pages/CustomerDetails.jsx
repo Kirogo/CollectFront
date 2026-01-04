@@ -1,4 +1,4 @@
-// src/pages/CustomerDetails.jsx - UPDATED WITH PERSISTENT COMMENTS
+// src/pages/CustomerDetails.jsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -36,12 +36,19 @@ const CustomerDetails = () => {
     // Payment Modal States
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+    const [showFullBalanceAlert, setShowFullBalanceAlert] = useState(false);
     const [paymentData, setPaymentData] = useState({
         phoneNumber: '',
-        amount: ''
+        alternativePhoneNumber: '',
+        amount: '',
+        useAlternativeNumber: false
     });
     const [mpesaStatus, setMpesaStatus] = useState(null);
     const [processingPayment, setProcessingPayment] = useState(false);
+
+    // Transaction filter states
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
 
     useEffect(() => {
         console.log('=== CUSTOMER DETAILS MOUNTED ===');
@@ -99,7 +106,9 @@ const CustomerDetails = () => {
                 setCustomer(customerData);
                 setPaymentData({
                     phoneNumber: customerData.phoneNumber || '',
-                    amount: customerData.arrears || ''
+                    alternativePhoneNumber: '',
+                    amount: customerData.arrears || '',
+                    useAlternativeNumber: false
                 });
             } else {
                 console.error('API returned success: false');
@@ -151,7 +160,7 @@ const CustomerDetails = () => {
             console.log('🔄 Fetching transactions for customer:', id);
 
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/transactions?customerId=${id}&limit=5`, {
+            const response = await axios.get(`http://localhost:5000/api/transactions?customerId=${id}&limit=10`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -172,34 +181,14 @@ const CustomerDetails = () => {
             setCommentsLoading(true);
             const token = localStorage.getItem('token');
 
-            console.log('🔄 Fetching comments for customer ID:', id);
-            console.log('Token exists:', !!token);
-
             try {
                 // Try to fetch from API first
                 const response = await axios.get(`http://localhost:5000/api/customers/${id}/comments`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                console.log('✅ Comments API response status:', response.status);
-                console.log('✅ Comments API response data:', response.data);
-
                 if (response.data.success) {
                     const comments = response.data.data.comments || [];
-                    console.log(`📝 Found ${comments.length} comments from API`);
-
-                    // Log each comment to see its structure
-                    comments.forEach((comment, index) => {
-                        console.log(`Comment ${index + 1}:`, {
-                            _id: comment._id,
-                            comment: comment.comment,
-                            author: comment.author,
-                            createdAt: comment.createdAt,
-                            hasCommentText: !!comment.comment,
-                            hasAuthor: !!comment.author
-                        });
-                    });
-
                     // Sort by createdAt descending (newest first)
                     const sortedComments = comments.sort((a, b) =>
                         new Date(b.createdAt) - new Date(a.createdAt)
@@ -209,31 +198,16 @@ const CustomerDetails = () => {
                     // Save to localStorage as backup cache
                     const commentsKey = `customer_comments_${id}`;
                     localStorage.setItem(commentsKey, JSON.stringify(sortedComments.slice(0, 50)));
-                } else {
-                    console.error('❌ Comments API returned success: false:', response.data.message);
                 }
             } catch (apiError) {
-                console.error('❌ Error fetching comments from API:', apiError.message);
-                console.error('❌ API error response:', apiError.response?.data);
-                console.error('❌ API error status:', apiError.response?.status);
+                console.error('Error fetching comments from API:', apiError.message);
 
                 // Fallback to localStorage
                 const commentsKey = `customer_comments_${id}`;
                 const storedComments = JSON.parse(localStorage.getItem(commentsKey) || '[]');
 
-                console.log(`📦 Found ${storedComments.length} cached comments in localStorage`);
-
                 if (storedComments.length > 0) {
                     console.log('Using cached comments from localStorage');
-                    // Log localStorage comments structure
-                    storedComments.forEach((comment, index) => {
-                        console.log(`LocalStorage Comment ${index + 1}:`, {
-                            _id: comment._id,
-                            comment: comment.comment,
-                            author: comment.author,
-                            createdAt: comment.createdAt
-                        });
-                    });
                     setCommentHistory(storedComments);
                 } else {
                     console.log('No comments found in cache');
@@ -241,7 +215,7 @@ const CustomerDetails = () => {
                 }
             }
         } catch (error) {
-            console.error('❌ Error in fetchCustomerComments:', error);
+            console.error('Error in fetchCustomerComments:', error);
         } finally {
             setCommentsLoading(false);
         }
@@ -309,9 +283,6 @@ const CustomerDetails = () => {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             const currentUser = user.name || user.username || 'Agent';
 
-            console.log('💾 Saving comment for user:', currentUser);
-            console.log('Comment text:', newComment);
-
             const commentData = {
                 comment: newComment.trim(),
                 type: 'follow_up',
@@ -329,8 +300,6 @@ const CustomerDetails = () => {
                 comment: newComment.trim() // Ensure comment text is included
             };
 
-            console.log('Optimistic comment:', optimisticComment);
-
             // Optimistically add to UI immediately
             setCommentHistory(prev => [optimisticComment, ...prev]);
 
@@ -340,7 +309,6 @@ const CustomerDetails = () => {
 
             // Try to save to backend API
             try {
-                console.log('📡 Sending comment to API...');
                 const response = await axios.post(
                     `http://localhost:5000/api/customers/${id}/comments`,
                     commentData,
@@ -352,11 +320,8 @@ const CustomerDetails = () => {
                     }
                 );
 
-                console.log('✅ API save response:', response.data);
-
                 if (response.data.success) {
                     const savedComment = response.data.data.comment || response.data.data;
-                    console.log('✅ Comment saved to server:', savedComment);
 
                     // Replace temporary comment with saved one from server
                     setCommentHistory(prev =>
@@ -375,8 +340,6 @@ const CustomerDetails = () => {
                     const updatedCache = [savedComment, ...filteredCache];
                     localStorage.setItem(commentsKey, JSON.stringify(updatedCache.slice(0, 50)));
 
-                    console.log('💾 Updated localStorage cache');
-
                     setTimeout(() => {
                         setCommentSaved(false);
                     }, 3000);
@@ -386,7 +349,6 @@ const CustomerDetails = () => {
                 }
             } catch (apiError) {
                 console.error('❌ API save failed:', apiError.message);
-                console.error('❌ API error details:', apiError.response?.data);
 
                 // Save to localStorage as fallback
                 const commentsKey = `customer_comments_${id}`;
@@ -398,8 +360,6 @@ const CustomerDetails = () => {
                     savedLocally: true,
                     comment: commentText // Use the original comment text
                 };
-
-                console.log('💾 Saving comment locally:', localComment);
 
                 // Remove temp comment and add local version
                 const filteredStored = storedComments.filter(c => c._id !== tempId);
@@ -453,6 +413,42 @@ const CustomerDetails = () => {
         }
     };
 
+    const formatTransactionDate = (dateString) => {
+        if (!dateString) return { date: 'N/A', time: '' };
+
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                return { date: 'Invalid date', time: '' };
+            }
+
+            const now = new Date();
+            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+
+            let dateDisplay;
+            if (diffDays === 0) dateDisplay = 'Today';
+            else if (diffDays === 1) dateDisplay = 'Yesterday';
+            else if (diffDays < 7) dateDisplay = `${diffDays} days ago`;
+            else {
+                dateDisplay = date.toLocaleDateString('en-KE', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            }
+
+            const timeDisplay = date.toLocaleTimeString('en-KE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            return { date: dateDisplay, time: timeDisplay };
+        } catch (error) {
+            return { date: 'N/A', time: '' };
+        }
+    };
+
     const formatCurrency = (amount) => {
         const numAmount = parseFloat(amount || 0);
         return new Intl.NumberFormat('en-KE', {
@@ -461,6 +457,18 @@ const CustomerDetails = () => {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(numAmount);
+    };
+
+    const getTransactionNumber = (transaction) => {
+        // Try different possible fields for transaction number
+        if (transaction.transactionId) return transaction.transactionId;
+        if (transaction.mpesaReceiptNumber) return transaction.mpesaReceiptNumber;
+        if (transaction.receiptNumber) return transaction.receiptNumber;
+        if (transaction.checkoutRequestId) return `CHK${transaction.checkoutRequestId.substring(0, 8)}`;
+        if (transaction._id) return `TRX${transaction._id.substring(0, 8).toUpperCase()}`;
+
+        // Fallback to a generated ID
+        return `TRX${Date.now().toString().substring(5)}`;
     };
 
     const getStatusColor = (arrears) => {
@@ -477,9 +485,44 @@ const CustomerDetails = () => {
         return 'In Arrears';
     };
 
+    const getAmountClass = (transaction) => {
+        const amount = parseFloat(transaction.amount || 0);
+        const status = transaction.status?.toLowerCase();
+
+        if (status === 'failed') return 'failed';
+        if (status === 'pending') return 'pending';
+        if (amount > 0) return 'credit';
+        if (amount < 0) return 'debit';
+        return '';
+    };
+
+    // Filter transactions
+    const filteredTransactions = transactions.filter(transaction => {
+        const matchesSearch = !searchTerm ||
+            transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            transaction.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            getTransactionNumber(transaction).toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus = !statusFilter ||
+            transaction.status?.toLowerCase() === statusFilter.toLowerCase();
+
+        return matchesSearch && matchesStatus;
+    });
+
+    // Calculate total for filtered transactions
+    const totalTransactionsAmount = filteredTransactions.reduce((sum, transaction) => {
+        return sum + parseFloat(transaction.amount || 0);
+    }, 0);
+
     const handleProcessPayment = () => {
         setShowPaymentModal(true);
         setMpesaStatus(null);
+        // Reset alternative phone number field when modal opens
+        setPaymentData(prev => ({
+            ...prev,
+            alternativePhoneNumber: '',
+            useAlternativeNumber: false
+        }));
     };
 
     const handleViewAllTransactions = () => {
@@ -514,29 +557,105 @@ const CustomerDetails = () => {
         }
     };
 
+    const handleExportTransactions = () => {
+        try {
+            // Create CSV content
+            const headers = ['Transaction No', 'Description', 'Amount', 'Status', 'Date'];
+            const rows = filteredTransactions.map(transaction => [
+                getTransactionNumber(transaction),
+                transaction.description || 'Loan Repayment',
+                formatCurrency(transaction.amount),
+                transaction.status || 'PENDING',
+                formatDate(transaction.createdAt)
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            // Create and download CSV file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `transactions_${customer?.customerId || id}_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+        } catch (error) {
+            console.error('Error exporting transactions:', error);
+            setError('Failed to export transactions');
+        }
+    };
+
     const handlePaymentInputChange = (e) => {
-        const { name, value } = e.target;
+        const { name, value, type, checked } = e.target;
         setPaymentData(prev => ({
             ...prev,
-            [name]: value
+            [name]: type === 'checkbox' ? checked : value
         }));
     };
 
-    const handleQuickAmount = (amount) => {
+    const handleQuickAmount = (amount, type = 'arrears') => {
+        const amountNum = parseFloat(amount || 0);
+        
+        if (type === 'fullBalance') {
+            // Check if amount exceeds daily limit
+            if (amountNum > 496500) {
+                setError(`Daily MPESA limit is ${formatCurrency(496500)}. The maximum amount that can be collected at once is ${formatCurrency(496500)}.`);
+                setTimeout(() => setError(null), 5000);
+                setPaymentData(prev => ({
+                    ...prev,
+                    amount: '496500'
+                }));
+            } else {
+                // Show confirmation alert for full balance
+                setShowFullBalanceAlert(true);
+            }
+        } else {
+            setPaymentData(prev => ({
+                ...prev,
+                amount
+            }));
+        }
+    };
+
+    const confirmFullBalancePayment = () => {
         setPaymentData(prev => ({
             ...prev,
-            amount
+            amount: customer?.loanBalance || ''
         }));
+        setShowFullBalanceAlert(false);
     };
 
     const handleSendPrompt = () => {
-        if (!paymentData.phoneNumber || !paymentData.amount) {
+        // Determine which phone number to use
+        const phoneToUse = paymentData.useAlternativeNumber 
+            ? paymentData.alternativePhoneNumber 
+            : paymentData.phoneNumber;
+
+        if (!phoneToUse || !paymentData.amount) {
             setError('Please enter phone number and amount');
             return;
         }
 
-        if (paymentData.phoneNumber.length !== 12 || !paymentData.phoneNumber.startsWith('254')) {
+        if (phoneToUse.length !== 12 || !phoneToUse.startsWith('254')) {
             setError('Please enter a valid Kenyan phone number (254XXXXXXXXX)');
+            return;
+        }
+
+        // Validate alternative phone number if enabled
+        if (paymentData.useAlternativeNumber && paymentData.alternativePhoneNumber.length !== 12) {
+            setError('Please enter a valid alternative Kenyan phone number (254XXXXXXXXX)');
+            return;
+        }
+
+        // Check daily limit
+        const amountNum = parseFloat(paymentData.amount);
+        if (amountNum > 496500) {
+            setError(`Daily MPESA limit exceeded. Maximum allowed is ${formatCurrency(496500)}`);
             return;
         }
 
@@ -549,13 +668,21 @@ const CustomerDetails = () => {
             setShowConfirmationModal(false);
 
             const token = localStorage.getItem('token');
+            
+            // Determine which phone number to use
+            const phoneToUse = paymentData.useAlternativeNumber 
+                ? paymentData.alternativePhoneNumber 
+                : paymentData.phoneNumber;
+
             const response = await axios.post(
                 'http://localhost:5000/api/payments/initiate',
                 {
-                    phoneNumber: paymentData.phoneNumber,
+                    phoneNumber: phoneToUse,
                     amount: parseFloat(paymentData.amount),
                     description: `Loan repayment for ${customer?.name}`,
-                    customerId: customer?._id || id
+                    customerId: customer?._id || id,
+                    isAlternativeNumber: paymentData.useAlternativeNumber,
+                    originalPhoneNumber: paymentData.phoneNumber
                 },
                 {
                     headers: {
@@ -569,7 +696,8 @@ const CustomerDetails = () => {
                 setMpesaStatus({
                     status: 'pending',
                     message: 'STK Push initiated successfully!',
-                    checkoutId: response.data.data.transaction?.transactionId
+                    checkoutId: response.data.data.transaction?.transactionId,
+                    phoneUsed: phoneToUse
                 });
 
                 // Refresh data after 5 seconds
@@ -674,9 +802,6 @@ const CustomerDetails = () => {
                             <Typography className="customer-details-title">
                                 {customer?.customerId || customer?._id || id}
                             </Typography>
-                            <Typography className="customer-details-subtitle">
-                                {customer?.name || 'Customer Details'}
-                            </Typography>
                         </Box>
                     </div>
 
@@ -686,7 +811,7 @@ const CustomerDetails = () => {
                             onClick={handleExportStatement}
                         >
                             <Download sx={{ fontSize: 16 }} />
-                            Export Statement
+                            Statement
                         </button>
                         <button
                             className="customer-details-primary-btn"
@@ -694,7 +819,7 @@ const CustomerDetails = () => {
                             disabled={parseFloat(customer?.loanBalance || 0) <= 0}
                         >
                             <Payment sx={{ fontSize: 16 }} />
-                            Process Payment
+                            Prompt
                         </button>
                     </div>
                 </div>
@@ -903,16 +1028,61 @@ const CustomerDetails = () => {
                             <Typography className="card-title">
                                 Recent Transactions
                             </Typography>
-                            <button
-                                className="customer-details-action-btn"
-                                onClick={handleViewAllTransactions}
-                            >
-                                <History sx={{ fontSize: 14 }} />
-                                View All
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    className="customer-details-action-btn"
+                                    onClick={handleExportTransactions}
+                                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                                >
+                                    <Download sx={{ fontSize: 12, mr: 0.5 }} />
+                                    Export
+                                </button>
+                                <button
+                                    className="customer-details-action-btn"
+                                    onClick={handleViewAllTransactions}
+                                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                                >
+                                    <History sx={{ fontSize: 12, mr: 0.5 }} />
+                                    View All
+                                </button>
+                            </div>
                         </div>
 
                         <div className="card-body transactions-table-container">
+                            {/* Transaction Filters */}
+                            <div className="transaction-filters" style={{ marginBottom: '12px', display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Search transactions..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '12px'
+                                    }}
+                                />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        background: 'white',
+                                        minWidth: '120px'
+                                    }}
+                                >
+                                    <option value="">All Status</option>
+                                    <option value="success">Success</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+
                             {transactionsLoading ? (
                                 <div className="empty-state">
                                     <LinearProgress sx={{
@@ -927,44 +1097,90 @@ const CustomerDetails = () => {
                                         Loading transactions...
                                     </Typography>
                                 </div>
-                            ) : transactions.length === 0 ? (
+                            ) : filteredTransactions.length === 0 ? (
                                 <div className="empty-state">
                                     <div className="empty-icon">📊</div>
                                     <Typography className="empty-text">
-                                        No transactions found for this customer
+                                        {searchTerm || statusFilter ? 'No transactions match your filters' : 'No transactions found for this customer'}
                                     </Typography>
+                                    {(searchTerm || statusFilter) && (
+                                        <button
+                                            onClick={() => {
+                                                setSearchTerm('');
+                                                setStatusFilter('');
+                                            }}
+                                            style={{
+                                                marginTop: '10px',
+                                                padding: '6px 12px',
+                                                background: '#5c4730',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                fontSize: '12px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Clear Filters
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
-                                <table className="transactions-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ width: '15%' }}>Date</th>
-                                            <th style={{ width: '35%' }}>Description</th>
-                                            <th style={{ width: '20%' }}>Amount</th>
-                                            <th style={{ width: '15%' }}>Status</th>
-                                            <th style={{ width: '15%' }}>Type</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {transactions.map((transaction) => (
-                                            <tr key={transaction._id || transaction.transactionId}>
-                                                <td>{formatDate(transaction.createdAt)}</td>
-                                                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {transaction.description || 'Loan Repayment'}
-                                                </td>
-                                                <td className={`transaction-amount ${transaction.status === 'SUCCESS' ? 'credit' : 'pending'}`}>
-                                                    {formatCurrency(transaction.amount)}
-                                                </td>
-                                                <td>
-                                                    <span className={`transaction-status ${transaction.status?.toLowerCase()}`}>
-                                                        {transaction.status || 'PENDING'}
-                                                    </span>
-                                                </td>
-                                                <td>{transaction.paymentMethod || 'MPESA'}</td>
+                                <>
+                                    <table className="transactions-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: '2%' }}>Transaction No</th>
+                                                <th style={{ width: '2%' }}>Amount</th>
+                                                <th style={{ width: '2%' }}>Status</th>
+                                                <th style={{ width: '5%' }}>Date</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {filteredTransactions.map((transaction) => {
+                                                const { date, time } = formatTransactionDate(transaction.createdAt);
+                                                return (
+                                                    <tr key={transaction._id || transaction.transactionId}>
+                                                        <td className="transaction-number">
+                                                            {getTransactionNumber(transaction)}
+                                                        </td>
+                                                        <td className={`transaction-amount ${getAmountClass(transaction)}`}>
+                                                            {formatCurrency(transaction.amount)}
+                                                        </td>
+                                                        <td>
+                                                            <span className={`transaction-status ${transaction.status?.toLowerCase()}`}>
+                                                                {transaction.status || 'PENDING'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="transaction-date">
+                                                            <span className="date">{date}</span>
+                                                            <span className="time">{time}</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style={{ background: '#f8fafc', fontWeight: '600' }}>
+                                                <td colSpan="1" style={{ textAlign: 'right', padding: '12px 16px' }}>
+                                                    Total:
+                                                </td>
+                                                <td className="transaction-amount" style={{ color: '#059669' }}>
+                                                    {formatCurrency(totalTransactionsAmount)}
+                                                </td>
+                                                <td colSpan="2"></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                    <div style={{
+                                        fontSize: '11px',
+                                        color: '#666',
+                                        textAlign: 'right',
+                                        marginTop: '8px',
+                                        padding: '4px 8px'
+                                    }}>
+                                        Showing {filteredTransactions.length} of {transactions.length} transactions
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>
@@ -1002,7 +1218,7 @@ const CustomerDetails = () => {
                             </div>
 
                             <div className="payment-form-group">
-                                <label className="payment-form-label">Phone Number (254XXXXXXXXX)</label>
+                                <label className="payment-form-label">Primary Phone Number</label>
                                 <input
                                     type="text"
                                     name="phoneNumber"
@@ -1011,7 +1227,48 @@ const CustomerDetails = () => {
                                     className="payment-form-input"
                                     placeholder="2547XXXXXXXX"
                                     maxLength="12"
+                                    disabled={paymentData.useAlternativeNumber}
                                 />
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                    Customer's registered phone number
+                                </div>
+                            </div>
+
+                            {/* Alternative Phone Number Section */}
+                            <div className="payment-form-group">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="useAlternativeNumber"
+                                        name="useAlternativeNumber"
+                                        checked={paymentData.useAlternativeNumber}
+                                        onChange={handlePaymentInputChange}
+                                        style={{ width: '16px', height: '16px' }}
+                                    />
+                                    <label htmlFor="useAlternativeNumber" style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#5c4730' }}>
+                                        Use Alternative Phone Number
+                                    </label>
+                                </div>
+                                
+                                <div style={{ 
+                                    opacity: paymentData.useAlternativeNumber ? 1 : 0.5,
+                                    pointerEvents: paymentData.useAlternativeNumber ? 'auto' : 'none'
+                                }}>
+                                    <label className="payment-form-label">Alternative Phone Number (254XXXXXXXXX)</label>
+                                    <input
+                                        type="text"
+                                        name="alternativePhoneNumber"
+                                        value={paymentData.alternativePhoneNumber}
+                                        onChange={handlePaymentInputChange}
+                                        className="payment-form-input"
+                                        placeholder="2547XXXXXXXX"
+                                        maxLength="12"
+                                        disabled={!paymentData.useAlternativeNumber}
+                                    />
+                                    <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                                        Use if primary number has insufficient funds
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="payment-form-group">
@@ -1031,17 +1288,21 @@ const CustomerDetails = () => {
                                     <button
                                         type="button"
                                         className="payment-amount-btn"
-                                        onClick={() => handleQuickAmount(customer?.arrears || '')}
+                                        onClick={() => handleQuickAmount(customer?.arrears || '', 'arrears')}
                                     >
                                         Arrears: {formatCurrency(customer?.arrears)}
                                     </button>
                                     <button
                                         type="button"
                                         className="payment-amount-btn"
-                                        onClick={() => handleQuickAmount(customer?.loanBalance || '')}
+                                        onClick={() => handleQuickAmount(customer?.loanBalance || '', 'fullBalance')}
                                     >
                                         Full Balance: {formatCurrency(customer?.loanBalance)}
                                     </button>
+                                </div>
+                                
+                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem', padding: '0.5rem', background: '#f8f9fa', borderRadius: '0.375rem' }}>
+                                    <strong>Note:</strong> Daily MPESA limit is {formatCurrency(496500)}. Amounts exceeding this will be capped.
                                 </div>
                             </div>
 
@@ -1055,6 +1316,8 @@ const CustomerDetails = () => {
                                     {mpesaStatus.checkoutId && (
                                         <div className="mpesa-status-details">
                                             Transaction ID: {mpesaStatus.checkoutId}
+                                            <br />
+                                            Phone Used: {mpesaStatus.phoneUsed}
                                         </div>
                                     )}
                                 </div>
@@ -1084,40 +1347,134 @@ const CustomerDetails = () => {
                 </div>
             )}
 
+            {/* Full Balance Confirmation Alert */}
+            {showFullBalanceAlert && (
+                <div className="payment-modal-overlay">
+                    <div className="confirmation-modal" style={{ maxWidth: '350px' }}>
+                        <div className="confirmation-modal-header">
+                            <Typography className="confirmation-modal-title" style={{ color: '#dc2626' }}>
+                                Confirm Full Balance Payment
+                            </Typography>
+                        </div>
+                        
+                        <div className="confirmation-modal-body">
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⚠️</div>
+                                <Typography style={{ fontWeight: '600', color: '#3c2a1c', marginBottom: '0.5rem' }}>
+                                    Are you sure you want to clear the full balance?
+                                </Typography>
+                                <Typography style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+                                    Amount: <strong>{formatCurrency(customer?.loanBalance)}</strong>
+                                </Typography>
+                                
+                                {parseFloat(customer?.loanBalance || 0) > 496500 && (
+                                    <div style={{ 
+                                        background: '#fef2f2', 
+                                        padding: '0.75rem', 
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid #fecaca',
+                                        marginBottom: '1rem'
+                                    }}>
+                                        <Typography style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
+                                            ⚠️ Daily Limit Alert
+                                        </Typography>
+                                        <Typography style={{ fontSize: '0.75rem', color: '#92400e' }}>
+                                            This amount exceeds the daily MPESA limit of {formatCurrency(496500)}. 
+                                            Only {formatCurrency(496500)} can be collected at once.
+                                        </Typography>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div className="confirmation-modal-footer">
+                            <button
+                                className="confirmation-modal-cancel-btn"
+                                onClick={() => setShowFullBalanceAlert(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="confirmation-modal-confirm-btn"
+                                onClick={confirmFullBalancePayment}
+                                style={{ background: '#dc2626' }}
+                            >
+                                Yes, Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Confirmation Modal */}
             {showConfirmationModal && (
                 <div className="payment-modal-overlay">
                     <div className="confirmation-modal">
                         <div className="confirmation-modal-header">
                             <div className="confirmation-modal-icon">
-                                <div className="mpesa-logo-text">MPESA</div>
+                                <img 
+                                    src="/images/mpesa-logo2.png" 
+                                    alt="MPESA" 
+                                    className="mpesa-logo-image"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.style.display = 'none';
+                                        // Fallback to text if image fails to load
+                                        const parent = e.target.parentElement;
+                                        const textDiv = document.createElement('div');
+                                        textDiv.className = 'mpesa-logo-text';
+                                        textDiv.textContent = 'MPESA';
+                                        parent.appendChild(textDiv);
+                                    }}
+                                />
                             </div>
                             <Typography className="confirmation-modal-title">
-                                Confirm Payment
-                            </Typography>
-                            <Typography className="confirmation-modal-subtitle">
-                                Verify details before sending
+                                Confirm Payment Request
                             </Typography>
                         </div>
 
                         <div className="confirmation-modal-body">
                             <div className="confirmation-info">
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.25rem' }}>
-                                    Phone number:
+                                <div style={{ 
+                                    fontSize: '0.6875rem', 
+                                    color: '#666', 
+                                    marginBottom: '0.125rem' 
+                                }}>
+                                    {paymentData.useAlternativeNumber ? 'Alternative Phone Number:' : 'Phone Number:'}
                                 </div>
                                 <div className="confirmation-phone">
-                                    {paymentData.phoneNumber}
+                                    {paymentData.useAlternativeNumber ? paymentData.alternativePhoneNumber : paymentData.phoneNumber}
+                                    {paymentData.useAlternativeNumber && (
+                                        <div style={{ fontSize: '0.625rem', color: '#666', marginTop: '0.25rem' }}>
+                                            (Alternative to: {paymentData.phoneNumber})
+                                        </div>
+                                    )}
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.75rem', marginBottom: '0.25rem' }}>
+                                <div style={{ 
+                                    fontSize: '0.6875rem', 
+                                    color: '#666', 
+                                    marginTop: '0.75rem', 
+                                    marginBottom: '0.125rem' 
+                                }}>
                                     Amount:
                                 </div>
                                 <div className="confirmation-amount">
                                     {formatCurrency(paymentData.amount)}
+                                    {parseFloat(paymentData.amount) > 496500 && (
+                                        <div style={{ fontSize: '0.625rem', color: '#dc2626', marginTop: '0.25rem', fontWeight: '600' }}>
+                                            ⚠️ Daily limit applied: {formatCurrency(496500)}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="confirmation-note">
                                 <strong>Note:</strong> Customer will receive a payment prompt on their phone and must enter their PIN to complete the transaction.
+                                {parseFloat(paymentData.amount) > 496500 && (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: '#fef2f2', borderRadius: '0.25rem' }}>
+                                        <strong>⚠️ Daily Limit:</strong> Only {formatCurrency(496500)} can be collected at once (MPESA daily limit).
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1132,7 +1489,7 @@ const CustomerDetails = () => {
                                 className="confirmation-modal-confirm-btn"
                                 onClick={handleConfirmPayment}
                             >
-                                Send Payment Request
+                                Send Request
                             </button>
                         </div>
                     </div>

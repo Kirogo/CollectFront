@@ -1,4 +1,4 @@
-// src/components/Auth/Login.jsx - With backend status
+// src/components/Auth/Login.jsx - Clean with Subtle Fill Animation
 import React, { useState } from 'react';
 import '../../../src/styles/components.css';
 
@@ -13,105 +13,79 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
     }
   };
 
-  // After successful login in your LoginPage component
-const handleLogin = async (username, password) => {
-  const result = await authService.login(username, password);
-  if (result.success) {
-    console.log('Token stored:', localStorage.getItem('token')); // Debug
-    console.log('User stored:', localStorage.getItem('user')); // Debug
-    navigate('/dashboard');
-  }
-};
-
-  // Auto-fill test credentials for easier testing
   const useTestCredentials = () => {
     setUsername('samuel.kirogo');
-    setPassword('pass1234');
+    setPassword('samuel.kirogo123');
   };
 
   return (
-    <div className="login-compact-wrapper">
-      {/* Backend Status Indicator */}
+    <div className="kollect-century-wrapper">
       {backendStatus === 'disconnected' && (
-        <div className="backend-warning">
-          <span className="warning-icon">⚠️</span>
+        <div className="kollect-century-warning">
+          <span className="kollect-warning-icon">⚠️</span>
           <span>Backend not connected. Make sure it's running on port 5000.</span>
         </div>
       )}
-      
-      <div className="login-compact-container">
-        {/* Left Panel - Branding */}
-        <div className="login-compact-left">
-          <div className="compact-ncba-logo">
-            <div className="compact-logo-circle">
-              <span className="compact-logo-text">NCBA</span>
+
+      <div className="kollect-century-card">
+        {/* LEFT PANEL - Branding with Subtle Fill Animation */}
+        <div className="kollect-century-left-panel">
+          <div className="kollect-century-left-content">
+            <div className="kollect-century-icon-container">
+              <div className="kollect-money-fill-container">
+                {/* Main icon container */}
+                <div className="kollect-money-icon">
+                  <div className="kollect-money-symbol">💰</div>
+                </div>
+
+                {/* Subtle fill animation only */}
+                <div className="kollect-money-fill-effect">
+                  <div className="kollect-money-fill-layer"></div>
+                </div>
+
+                {/* Container outline */}
+                <div className="kollect-money-container-outline"></div>
+              </div>
+            </div>
+            <div className="kollect-century-brand">
+              <h1 className="kollect-century-title">Kollect</h1>
+              <p className="kollect-century-subtitle">Collections Portal</p>
             </div>
           </div>
-          <h2 className="compact-subtitle">Collections Department</h2>
-          <p className="compact-tagline">STK Push Loan Repayment System</p>
-          
-          <div className="compact-features">
-            <div className="compact-feature">
-              <div className="compact-feature-icon">🔒</div>
-              <div className="compact-feature-text">Secure Staff Access</div>
-            </div>
-            <div className="compact-feature">
-              <div className="compact-feature-icon">💰</div>
-              <div className="compact-feature-text">Direct MPesa Payments</div>
-            </div>
-            <div className="compact-feature">
-              <div className="compact-feature-icon">⚡</div>
-              <div className="compact-feature-text">Real-time Processing</div>
-            </div>
-          </div>
-          
-          {/* Test Credentials Button */}
-          <button 
-            onClick={useTestCredentials}
-            className="test-credentials-btn"
-            type="button"
-          >
-            Use Test Credentials
-          </button>
         </div>
 
-        {/* Right Panel - Login Form */}
-        <div className="login-compact-right">
-          <div className="compact-form-card">
-            <div className="compact-form-header">
-              <h3>Staff Login</h3>
-              <p>Enter username or email with password</p>
+        {/* RIGHT PANEL - Login Form */}
+        <div className="kollect-century-right-panel">
+          <div className="kollect-century-form-container">
+            <div className="kollect-century-form-header">
+              <h2 className="kollect-century-form-title">Sign In</h2>
+              <p className="kollect-century-form-subtitle">Access your account</p>
             </div>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="kollect-century-form">
               {error && (
-                <div className="compact-form-error">
-                  <span className="error-icon">⚠️</span>
-                  <span>{error}</span>
+                <div className="kollect-century-alert">
+                  <span className="kollect-century-alert-icon">!</span>
+                  <span className="kollect-century-alert-text">{error}</span>
                 </div>
               )}
 
-              <div className="compact-form-group">
-                <label>
-                  <span className="label-icon">👤</span>
-                  Username
-                </label>
+              <div className="kollect-century-field-group">
+                <label className="kollect-century-field-label">Username</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="staff or staff@ncbabank.co.ke"
+                  placeholder="Enter your username"
                   required
                   disabled={loading}
                   autoFocus
+                  className="kollect-century-input"
                 />
               </div>
 
-              <div className="compact-form-group">
-                <label>
-                  <span className="label-icon">🔒</span>
-                  Password
-                </label>
+              <div className="kollect-century-field-group">
+                <label className="kollect-century-field-label">Password</label>
                 <input
                   type="password"
                   value={password}
@@ -119,42 +93,46 @@ const handleLogin = async (username, password) => {
                   placeholder="Enter your password"
                   required
                   disabled={loading}
+                  className="kollect-century-input"
                 />
               </div>
 
-              <button 
-                type="submit" 
-                disabled={loading || !username || !password}
-                className="compact-login-btn"
-              >
-                {loading ? (
-                  <>
-                    <span className="compact-spinner"></span>
-                    Authenticating...
-                  </>
-                ) : (
-                  'Login to System'
-                )}
-              </button>
+              <div className="kollect-century-actions">
+                <button
+                  type="submit"
+                  disabled={loading || !username || !password}
+                  className="kollect-century-primary-btn"
+                >
+                  {loading ? (
+                    <>
+                      <span className="kollect-century-btn-spinner"></span>
+                      <span>Signing In...</span>
+                    </>
+                  ) : (
+                    'Login to Portal'
+                  )}
+                </button>
 
-              <div className="compact-form-footer">
-                <div className="security-info">
-                  <span className="shield-icon">🛡️</span>
-                  <span>Authorized personnel only</span>
+                <div className="kollect-century-secondary">
+                  <button
+                    onClick={useTestCredentials}
+                    className="kollect-century-secondary-btn"
+                    type="button"
+                    disabled={loading}
+                  >
+                    <span>Use Test Credentials</span>
+                  </button>
                 </div>
-                <div className="support-contact">
-                  Backend Status: 
-                  <span className={`status-indicator ${backendStatus}`}>
-                    {backendStatus === 'connected' ? '✅ Connected' : 
-                     backendStatus === 'disconnected' ? '❌ Disconnected' : '⚠️ Checking'}
-                  </span>
+              </div>
+
+              <div className="kollect-century-footer">
+                <div className="kollect-century-footer-content">
+                  <span className="kollect-century-footer-text">Kollect v1.0</span>
+                  <span className="kollect-century-footer-separator">•</span>
+                  <span className="kollect-century-footer-text">Secure Banking</span>
                 </div>
               </div>
             </form>
-
-            <div className="compact-version">
-              <span>v2.1.4 • Collections Module</span>
-            </div>
           </div>
         </div>
       </div>
