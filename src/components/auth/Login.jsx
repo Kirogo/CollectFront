@@ -106,10 +106,10 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
                   {loading ? (
                     <>
                       <span className="kollect-century-btn-spinner"></span>
-                      <span>Signing In...</span>
+                      <span>Logging In...</span>
                     </>
                   ) : (
-                    'Login to Portal'
+                    'Login'
                   )}
                 </button>
 

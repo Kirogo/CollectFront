@@ -81,11 +81,6 @@ const Navbar = ({ title, onMenuToggle }) => {
       </div>
 
       <div className="navbar-right">
-        {/* Notifications */}
-        <button className="nav-icon-btn">
-          <span className="icon">🔔</span>
-          <span className="badge">3</span>
-        </button>
 
         {/* User Profile - Minimal version */}
         <div className="user-profile">

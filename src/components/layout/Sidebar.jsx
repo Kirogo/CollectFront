@@ -60,12 +60,12 @@ const Sidebar = ({ onMenuToggle }) => {
       {/* Logo Section - Compact */}
       <div className="sidebar-logo">
         <div className="logo-icon">
-          <span className="logo-text">N</span>
+          <span className="logo-text">K</span>
         </div>
         {!collapsed && (
           <div className="logo-text-container">
-            <h3>NCBA Kollect</h3>
-            <p className="logo-subtitle">Collections System</p>
+            <h3>Kollect</h3>
+            <p className="logo-subtitle">Collections Portal</p>
           </div>
         )}
         <button 

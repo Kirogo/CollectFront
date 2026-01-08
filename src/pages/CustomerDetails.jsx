@@ -1,5 +1,5 @@
-// src/pages/CustomerDetails.jsx - UPDATED VERSION
-import React, { useState, useEffect } from 'react';
+// src/pages/CustomerDetails.jsx - UPDATED WITH PAYMENT IMPROVEMENTS
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     Box,
@@ -10,8 +10,7 @@ import {
 import {
     ArrowBack,
     Download,
-    Payment,
-    History,
+    SendToMobile,
     Comment
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -36,7 +35,7 @@ const CustomerDetails = () => {
     // Payment Modal States
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-    const [showFullBalanceAlert, setShowFullBalanceAlert] = useState(false);
+    const [showFullBalancePopup, setShowFullBalancePopup] = useState(false);
     const [paymentData, setPaymentData] = useState({
         phoneNumber: '',
         alternativePhoneNumber: '',
@@ -45,10 +44,47 @@ const CustomerDetails = () => {
     });
     const [mpesaStatus, setMpesaStatus] = useState(null);
     const [processingPayment, setProcessingPayment] = useState(false);
+    const [paymentInitiated, setPaymentInitiated] = useState(false);
+
+    // Active transaction tracking
+    const [hasActiveTransaction, setHasActiveTransaction] = useState(false);
+    const [activeTransactionStatus, setActiveTransactionStatus] = useState(null);
 
     // Transaction filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+
+    // Ref for auto-close timer
+    const autoCloseTimerRef = useRef(null);
+
+    // Clear any existing timer on unmount
+    useEffect(() => {
+        return () => {
+            if (autoCloseTimerRef.current) {
+                clearTimeout(autoCloseTimerRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showFullBalancePopup) {
+                const popup = document.querySelector('.full-balance-popup-attached');
+                const fullBalanceButton = document.querySelector('.payment-amount-btn-customer');
+
+                if (popup &&
+                    !popup.contains(event.target) &&
+                    !fullBalanceButton?.contains(event.target)) {
+                    setShowFullBalancePopup(false);
+                }
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showFullBalancePopup]);
 
     useEffect(() => {
         console.log('=== CUSTOMER DETAILS MOUNTED ===');
@@ -71,6 +107,40 @@ const CustomerDetails = () => {
             syncLocalComments();
         }
     }, [customer, loading]);
+
+    // Check for active transactions on component mount and when transactions change
+    useEffect(() => {
+        const checkActiveTransactions = () => {
+            const activeTx = transactions.find(tx => {
+                const status = tx.status?.toLowerCase();
+                return status === 'pending' || status === 'initiated';
+            });
+
+            setHasActiveTransaction(!!activeTx);
+            if (activeTx) {
+                setActiveTransactionStatus(activeTx.status);
+            }
+        };
+
+        checkActiveTransactions();
+    }, [transactions]);
+
+    // Poll for transaction status updates when there's an active transaction
+    useEffect(() => {
+        let pollInterval;
+
+        if (hasActiveTransaction) {
+            pollInterval = setInterval(() => {
+                fetchCustomerTransactions();
+            }, 5000); // Poll every 5 seconds
+        }
+
+        return () => {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        };
+    }, [hasActiveTransaction, id]);
 
     const fetchCustomerDetails = async () => {
         console.log('🔄 Starting fetchCustomerDetails');
@@ -160,12 +230,26 @@ const CustomerDetails = () => {
             console.log('🔄 Fetching transactions for customer:', id);
 
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/transactions?customerId=${id}&limit=10`, {
+            const response = await axios.get(`http://localhost:5000/api/transactions?customerId=${id}&limit=10&sort=-createdAt`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (response.data.success) {
-                setTransactions(response.data.data || []);
+                const newTransactions = response.data.data || [];
+                setTransactions(newTransactions);
+
+                // Check if there are any active transactions
+                const activeTx = newTransactions.find(tx => {
+                    const status = tx.status?.toLowerCase();
+                    return status === 'pending' || status === 'initiated';
+                });
+
+                setHasActiveTransaction(!!activeTx);
+                if (activeTx) {
+                    setActiveTransactionStatus(activeTx.status);
+                } else {
+                    setActiveTransactionStatus(null);
+                }
             }
         } catch (error) {
             console.error('❌ Error fetching transactions:', error.message);
@@ -459,6 +543,16 @@ const CustomerDetails = () => {
         }).format(numAmount);
     };
 
+    const handleRefreshTransactions = () => {
+        setTransactionsLoading(true);
+        fetchCustomerTransactions();
+        setSearchTerm('');
+        setStatusFilter('');
+        setTimeout(() => {
+            setTransactionsLoading(false);
+        }, 500);
+    };
+
     const getTransactionNumber = (transaction) => {
         // Try different possible fields for transaction number
         if (transaction.transactionId) return transaction.transactionId;
@@ -485,15 +579,29 @@ const CustomerDetails = () => {
         return 'In Arrears';
     };
 
-    const getAmountClass = (transaction) => {
-        const amount = parseFloat(transaction.amount || 0);
-        const status = transaction.status?.toLowerCase();
+    const getFailureReasonText = (failureReason) => {
+        const reasons = {
+            'INSUFFICIENT_FUNDS': 'Insufficient Funds',
+            'TECHNICAL_ERROR': 'Technical Error',
+            'WRONG_PIN': 'Wrong PIN',
+            'USER_CANCELLED': 'User Cancelled',
+            'NETWORK_ERROR': 'Network Error',
+            'EXPIRED': 'Expired',
+            'OTHER': 'Other'
+        };
+        return reasons[failureReason] || 'Unknown';
+    };
 
-        if (status === 'failed') return 'failed';
-        if (status === 'pending') return 'pending';
-        if (amount > 0) return 'credit';
-        if (amount < 0) return 'debit';
-        return '';
+    // Add this function for status display
+    const getStatusDisplayText = (status, failureReason) => {
+        const statusMap = {
+            'success': 'Success',
+            'failed': failureReason ? `Failed (${getFailureReasonText(failureReason)})` : 'Failed',
+            'pending': 'Pending',
+            'expired': 'Expired',
+            'cancelled': 'Cancelled'
+        };
+        return statusMap[status?.toLowerCase()] || status || 'PENDING';
     };
 
     // Filter transactions
@@ -509,24 +617,17 @@ const CustomerDetails = () => {
         return matchesSearch && matchesStatus;
     });
 
-    // Calculate total for filtered transactions
-    const totalTransactionsAmount = filteredTransactions.reduce((sum, transaction) => {
-        return sum + parseFloat(transaction.amount || 0);
-    }, 0);
-
     const handleProcessPayment = () => {
+        console.log('Opening payment modal');
         setShowPaymentModal(true);
         setMpesaStatus(null);
+        setPaymentInitiated(false);
         // Reset alternative phone number field when modal opens
         setPaymentData(prev => ({
             ...prev,
             alternativePhoneNumber: '',
             useAlternativeNumber: false
         }));
-    };
-
-    const handleViewAllTransactions = () => {
-        navigate(`/transactions?customerId=${id}`);
     };
 
     const handleExportStatement = async () => {
@@ -557,39 +658,6 @@ const CustomerDetails = () => {
         }
     };
 
-    const handleExportTransactions = () => {
-        try {
-            // Create CSV content
-            const headers = ['Transaction No', 'Description', 'Amount', 'Status', 'Date'];
-            const rows = filteredTransactions.map(transaction => [
-                getTransactionNumber(transaction),
-                transaction.description || 'Loan Repayment',
-                formatCurrency(transaction.amount),
-                transaction.status || 'PENDING',
-                formatDate(transaction.createdAt)
-            ]);
-
-            const csvContent = [
-                headers.join(','),
-                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-            ].join('\n');
-
-            // Create and download CSV file
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `transactions_${customer?.customerId || id}_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-        } catch (error) {
-            console.error('Error exporting transactions:', error);
-            setError('Failed to export transactions');
-        }
-    };
-
     const handlePaymentInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         setPaymentData(prev => ({
@@ -599,22 +667,14 @@ const CustomerDetails = () => {
     };
 
     const handleQuickAmount = (amount, type = 'arrears') => {
-        const amountNum = parseFloat(amount || 0);
-        
+        console.log('handleQuickAmount called:', { type, amount });
+
         if (type === 'fullBalance') {
-            // Check if amount exceeds daily limit
-            if (amountNum > 496500) {
-                setError(`Daily MPESA limit is ${formatCurrency(496500)}. The maximum amount that can be collected at once is ${formatCurrency(496500)}.`);
-                setTimeout(() => setError(null), 5000);
-                setPaymentData(prev => ({
-                    ...prev,
-                    amount: '496500'
-                }));
-            } else {
-                // Show confirmation alert for full balance
-                setShowFullBalanceAlert(true);
-            }
+            console.log('Showing full balance popup');
+            // Show popup attached to the button
+            setShowFullBalancePopup(true);
         } else {
+            // Directly set arrears amount
             setPaymentData(prev => ({
                 ...prev,
                 amount
@@ -622,18 +682,36 @@ const CustomerDetails = () => {
         }
     };
 
-    const confirmFullBalancePayment = () => {
-        setPaymentData(prev => ({
-            ...prev,
-            amount: customer?.loanBalance || ''
-        }));
-        setShowFullBalanceAlert(false);
+    // Confirm full balance payment from simple popup
+    const confirmFullBalanceFromPopup = () => {
+        console.log('confirmFullBalanceFromPopup called');
+        const amountNum = parseFloat(customer?.loanBalance || 0);
+
+        // Check if amount exceeds daily limit
+        if (amountNum > 496500) {
+            // Show error message and set to max allowed
+            setError(`Daily MPESA limit is ${formatCurrency(496500)}. The maximum amount that can be collected at once is ${formatCurrency(496500)}.`);
+            setTimeout(() => setError(null), 5000);
+            setPaymentData(prev => ({
+                ...prev,
+                amount: '496500'
+            }));
+        } else {
+            // Set full balance amount
+            setPaymentData(prev => ({
+                ...prev,
+                amount: customer?.loanBalance || ''
+            }));
+        }
+
+        // Close the popup
+        setShowFullBalancePopup(false);
     };
 
     const handleSendPrompt = () => {
         // Determine which phone number to use
-        const phoneToUse = paymentData.useAlternativeNumber 
-            ? paymentData.alternativePhoneNumber 
+        const phoneToUse = paymentData.useAlternativeNumber
+            ? paymentData.alternativePhoneNumber
             : paymentData.phoneNumber;
 
         if (!phoneToUse || !paymentData.amount) {
@@ -665,13 +743,14 @@ const CustomerDetails = () => {
     const handleConfirmPayment = async () => {
         try {
             setProcessingPayment(true);
+            setPaymentInitiated(true);
             setShowConfirmationModal(false);
 
             const token = localStorage.getItem('token');
-            
+
             // Determine which phone number to use
-            const phoneToUse = paymentData.useAlternativeNumber 
-                ? paymentData.alternativePhoneNumber 
+            const phoneToUse = paymentData.useAlternativeNumber
+                ? paymentData.alternativePhoneNumber
                 : paymentData.phoneNumber;
 
             const response = await axios.post(
@@ -694,31 +773,47 @@ const CustomerDetails = () => {
 
             if (response.data.success) {
                 setMpesaStatus({
-                    status: 'pending',
-                    message: 'STK Push initiated successfully!',
+                    status: 'success',
+                    message: 'STK Push has been initiated successfully',
                     checkoutId: response.data.data.transaction?.transactionId,
-                    phoneUsed: phoneToUse
+                    phoneUsed: phoneToUse,
+                    details: 'The customer has been prompted to enter their PIN on their phone. Please wait for payment confirmation.'
                 });
 
-                // Refresh data after 5 seconds
-                setTimeout(() => {
-                    fetchCustomerDetails();
-                    fetchCustomerTransactions();
-                }, 5000);
+                // Refresh transactions to get the new pending transaction
+                fetchCustomerTransactions();
             } else {
                 setMpesaStatus({
                     status: 'failed',
-                    message: response.data.message || 'Failed to initiate payment'
+                    message: response.data.message || 'Failed to initiate payment',
+                    details: 'Please try again or contact support if the issue persists.'
                 });
+                setPaymentInitiated(false);
+                setProcessingPayment(false);
             }
         } catch (error) {
             console.error('Error sending payment request:', error);
             setMpesaStatus({
                 status: 'failed',
-                message: error.response?.data?.message || 'Failed to send payment request. Please try again.'
+                message: error.response?.data?.message || 'Failed to send payment request. Please try again.',
+                details: 'Please check your network connection and try again.'
             });
-        } finally {
+            setPaymentInitiated(false);
             setProcessingPayment(false);
+        }
+    };
+
+    const closePaymentModal = () => {
+        setShowPaymentModal(false);
+        setMpesaStatus(null);
+        setPaymentInitiated(false);
+        setShowFullBalancePopup(false);
+        setProcessingPayment(false);
+
+        // Clear any pending auto-close timer
+        if (autoCloseTimerRef.current) {
+            clearTimeout(autoCloseTimerRef.current);
+            autoCloseTimerRef.current = null;
         }
     };
 
@@ -816,10 +911,14 @@ const CustomerDetails = () => {
                         <button
                             className="customer-details-primary-btn"
                             onClick={handleProcessPayment}
-                            disabled={parseFloat(customer?.loanBalance || 0) <= 0}
+                            disabled={parseFloat(customer?.loanBalance || 0) <= 0 || hasActiveTransaction}
+                            style={{
+                                opacity: hasActiveTransaction ? 0.6 : 1,
+                                cursor: hasActiveTransaction ? 'not-allowed' : 'pointer'
+                            }}
                         >
-                            <Payment sx={{ fontSize: 16 }} />
-                            Prompt
+                            <SendToMobile sx={{ fontSize: 16 }} />
+                            {hasActiveTransaction ? `Active (${activeTransactionStatus})` : 'Prompt'}
                         </button>
                     </div>
                 </div>
@@ -1022,103 +1121,72 @@ const CustomerDetails = () => {
                         </div>
                     </div>
 
-                    {/* Recent Transactions Card */}
+                    {/* Recent Transactions Card - SIMPLIFIED */}
                     <div className="details-card transactions-card">
                         <div className="card-header">
                             <Typography className="card-title">
                                 Recent Transactions
                             </Typography>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
-                                    className="customer-details-action-btn"
-                                    onClick={handleExportTransactions}
-                                    style={{ fontSize: '12px', padding: '6px 12px' }}
-                                >
-                                    <Download sx={{ fontSize: 12, mr: 0.5 }} />
-                                    Export
-                                </button>
-                                <button
-                                    className="customer-details-action-btn"
-                                    onClick={handleViewAllTransactions}
-                                    style={{ fontSize: '12px', padding: '6px 12px' }}
-                                >
-                                    <History sx={{ fontSize: 12, mr: 0.5 }} />
-                                    View All
-                                </button>
-                            </div>
+                            <button
+                                className="customer-details-action-btn"
+                                onClick={handleRefreshTransactions}
+                                style={{
+                                    fontSize: '12px',
+                                    padding: '6px 12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                </svg>
+                                Refresh
+                            </button>
                         </div>
 
-                        <div className="card-body transactions-table-container">
+                        <div className="card-body simple-transactions-container">
                             {/* Transaction Filters */}
-                            <div className="transaction-filters" style={{ marginBottom: '12px', display: 'flex', gap: '8px' }}>
+                            <div className="simple-filters">
                                 <input
                                     type="text"
                                     placeholder="Search transactions..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    style={{
-                                        flex: 1,
-                                        padding: '8px 12px',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '4px',
-                                        fontSize: '12px'
-                                    }}
+                                    className="simple-search-input"
                                 />
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
-                                    style={{
-                                        padding: '8px 12px',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '4px',
-                                        fontSize: '12px',
-                                        background: 'white',
-                                        minWidth: '120px'
-                                    }}
+                                    className="simple-status-filter"
                                 >
                                     <option value="">All Status</option>
                                     <option value="success">Success</option>
                                     <option value="pending">Pending</option>
                                     <option value="failed">Failed</option>
+                                    <option value="expired">Expired</option>
+                                    <option value="cancelled">Cancelled</option>
                                 </select>
                             </div>
 
                             {transactionsLoading ? (
-                                <div className="empty-state">
-                                    <LinearProgress sx={{
-                                        mb: 1.5,
-                                        borderRadius: '4px',
-                                        backgroundColor: '#f5f0ea',
-                                        '& .MuiLinearProgress-bar': {
-                                            backgroundColor: '#5c4730'
-                                        }
-                                    }} />
-                                    <Typography className="empty-text">
-                                        Loading transactions...
-                                    </Typography>
+                                <div className="simple-loading">
+                                    <div className="simple-spinner"></div>
+                                    <div className="simple-loading-text">Loading transactions...</div>
                                 </div>
                             ) : filteredTransactions.length === 0 ? (
-                                <div className="empty-state">
-                                    <div className="empty-icon">📊</div>
-                                    <Typography className="empty-text">
+                                <div className="simple-empty-state">
+                                    <div className="simple-empty-icon">📄</div>
+                                    <div className="simple-empty-text">
                                         {searchTerm || statusFilter ? 'No transactions match your filters' : 'No transactions found for this customer'}
-                                    </Typography>
+                                    </div>
                                     {(searchTerm || statusFilter) && (
                                         <button
                                             onClick={() => {
                                                 setSearchTerm('');
                                                 setStatusFilter('');
                                             }}
-                                            style={{
-                                                marginTop: '10px',
-                                                padding: '6px 12px',
-                                                background: '#5c4730',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                fontSize: '12px',
-                                                cursor: 'pointer'
-                                            }}
+                                            className="simple-clear-btn"
                                         >
                                             Clear Filters
                                         </button>
@@ -1126,58 +1194,74 @@ const CustomerDetails = () => {
                                 </div>
                             ) : (
                                 <>
-                                    <table className="transactions-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: '2%' }}>Transaction No</th>
-                                                <th style={{ width: '2%' }}>Amount</th>
-                                                <th style={{ width: '2%' }}>Status</th>
-                                                <th style={{ width: '5%' }}>Date</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredTransactions.map((transaction) => {
-                                                const { date, time } = formatTransactionDate(transaction.createdAt);
-                                                return (
-                                                    <tr key={transaction._id || transaction.transactionId}>
-                                                        <td className="transaction-number">
-                                                            {getTransactionNumber(transaction)}
-                                                        </td>
-                                                        <td className={`transaction-amount ${getAmountClass(transaction)}`}>
-                                                            {formatCurrency(transaction.amount)}
-                                                        </td>
-                                                        <td>
-                                                            <span className={`transaction-status ${transaction.status?.toLowerCase()}`}>
-                                                                {transaction.status || 'PENDING'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="transaction-date">
-                                                            <span className="date">{date}</span>
-                                                            <span className="time">{time}</span>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr style={{ background: '#f8fafc', fontWeight: '600' }}>
-                                                <td colSpan="1" style={{ textAlign: 'right', padding: '12px 16px' }}>
-                                                    Total:
-                                                </td>
-                                                <td className="transaction-amount" style={{ color: '#059669' }}>
-                                                    {formatCurrency(totalTransactionsAmount)}
-                                                </td>
-                                                <td colSpan="2"></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                    <div style={{
-                                        fontSize: '11px',
-                                        color: '#666',
-                                        textAlign: 'right',
-                                        marginTop: '8px',
-                                        padding: '4px 8px'
-                                    }}>
+                                    <div className="simple-table-wrapper">
+                                        <table className="simple-transactions-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Transaction No</th>
+                                                    <th>Amount</th>
+                                                    <th>Status</th>
+                                                    <th>Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredTransactions.map((transaction) => {
+                                                    const { date, time } = formatTransactionDate(transaction.createdAt);
+                                                    const status = transaction.status?.toLowerCase();
+
+                                                    return (
+                                                        <tr key={transaction._id || transaction.transactionId}>
+                                                            <td className="simple-transaction-id">
+                                                                {getTransactionNumber(transaction)}
+                                                            </td>
+                                                            <td className="simple-amount">
+                                                                {formatCurrency(transaction.amount)}
+                                                            </td>
+                                                            <td>
+                                                                <span
+                                                                    className="simple-status"
+                                                                    style={{
+                                                                        backgroundColor: status === 'success' ? '#d1fae5' :
+                                                                            status === 'pending' ? '#fef3c7' :
+                                                                                status === 'failed' ? '#fee2e2' :
+                                                                                    status === 'expired' ? '#f3f4f6' : '#f3f4f6',
+                                                                        color: status === 'success' ? '#059669' :
+                                                                            status === 'pending' ? '#d97706' :
+                                                                                status === 'failed' ? '#dc2626' : '#6b7280',
+                                                                        borderColor: status === 'success' ? '#a7f3d0' :
+                                                                            status === 'pending' ? '#fde68a' :
+                                                                                status === 'failed' ? '#fecaca' : '#d1d5db'
+                                                                    }}
+                                                                >
+                                                                    {getStatusDisplayText(transaction.status, transaction.failureReason)}
+                                                                </span>
+                                                            </td>
+                                                            <td className="simple-date">
+                                                                <div className="simple-date-text">{date}</div>
+                                                                <div className="simple-time-text">{time}</div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Total row - Successful transactions only */}
+                                    {(() => {
+                                        const successfulTotal = filteredTransactions
+                                            .filter(transaction => transaction.status?.toLowerCase() === 'success')
+                                            .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
+
+                                        return successfulTotal > 0 ? (
+                                            <div className="simple-total-row">
+                                                <div className="simple-total-label">Total Successful:</div>
+                                                <div className="simple-total-amount">{formatCurrency(successfulTotal)}</div>
+                                            </div>
+                                        ) : null;
+                                    })()}
+
+                                    <div className="simple-count">
                                         Showing {filteredTransactions.length} of {transactions.length} transactions
                                     </div>
                                 </>
@@ -1187,220 +1271,238 @@ const CustomerDetails = () => {
                 </div>
             </div>
 
-            {/* Payment Modal */}
+            {/* Payment Modal - UPDATED WITH SUCCESS MESSAGE INSIDE */}
             {showPaymentModal && (
-                <div className="payment-modal-overlay">
-                    <div className="payment-modal">
-                        <div className="payment-modal-header">
-                            <Typography className="payment-modal-title">
+                <div className="payment-modal-overlay-customer">
+                    <div className="payment-modal-customer">
+                        <div className="payment-modal-header-customer">
+                            <Typography className="payment-modal-title-customer">
                                 Process Payment
                             </Typography>
                         </div>
 
-                        <div className="payment-modal-body">
-                            <div className="payment-info-container">
-                                <div className="payment-info-item">
-                                    <span className="payment-info-label">Customer:</span>
-                                    <span className="payment-info-value">{customer?.name}</span>
-                                </div>
-                                <div className="payment-info-item">
-                                    <span className="payment-info-label">Account:</span>
-                                    <span className="payment-info-value">{customer?.accountNumber}</span>
-                                </div>
-                                <div className="payment-info-item">
-                                    <span className="payment-info-label">Loan Balance:</span>
-                                    <span className="payment-info-value amount">{formatCurrency(customer?.loanBalance)}</span>
-                                </div>
-                                <div className="payment-info-item">
-                                    <span className="payment-info-label">Arrears:</span>
-                                    <span className="payment-info-value amount">{formatCurrency(customer?.arrears)}</span>
-                                </div>
-                            </div>
-
-                            <div className="payment-form-group">
-                                <label className="payment-form-label">Primary Phone Number</label>
-                                <input
-                                    type="text"
-                                    name="phoneNumber"
-                                    value={paymentData.phoneNumber}
-                                    onChange={handlePaymentInputChange}
-                                    className="payment-form-input"
-                                    placeholder="2547XXXXXXXX"
-                                    maxLength="12"
-                                    disabled={paymentData.useAlternativeNumber}
-                                />
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                                    Customer's registered phone number
-                                </div>
-                            </div>
-
-                            {/* Alternative Phone Number Section */}
-                            <div className="payment-form-group">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                    <input
-                                        type="checkbox"
-                                        id="useAlternativeNumber"
-                                        name="useAlternativeNumber"
-                                        checked={paymentData.useAlternativeNumber}
-                                        onChange={handlePaymentInputChange}
-                                        style={{ width: '16px', height: '16px' }}
-                                    />
-                                    <label htmlFor="useAlternativeNumber" style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#5c4730' }}>
-                                        Use Alternative Phone Number
-                                    </label>
-                                </div>
-                                
-                                <div style={{ 
-                                    opacity: paymentData.useAlternativeNumber ? 1 : 0.5,
-                                    pointerEvents: paymentData.useAlternativeNumber ? 'auto' : 'none'
-                                }}>
-                                    <label className="payment-form-label">Alternative Phone Number (254XXXXXXXXX)</label>
-                                    <input
-                                        type="text"
-                                        name="alternativePhoneNumber"
-                                        value={paymentData.alternativePhoneNumber}
-                                        onChange={handlePaymentInputChange}
-                                        className="payment-form-input"
-                                        placeholder="2547XXXXXXXX"
-                                        maxLength="12"
-                                        disabled={!paymentData.useAlternativeNumber}
-                                    />
-                                    <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                                        Use if primary number has insufficient funds
+                        <div className="payment-modal-body-customer">
+                            {/* Success Message displayed right under the header */}
+                            {mpesaStatus && mpesaStatus.status === 'success' && (
+                                <div className="mpesa-status-inline-customer success">
+                                    <div className="mpesa-status-icon-customer">✅</div>
+                                    <div className="mpesa-status-content-customer">
+                                        <div className="mpesa-status-message-customer">{mpesaStatus.message}</div>
+                                        {mpesaStatus.details && (
+                                            <div className="mpesa-status-details-customer">{mpesaStatus.details}</div>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="payment-form-group">
-                                <label className="payment-form-label">Amount (KES)</label>
-                                <input
-                                    type="number"
-                                    name="amount"
-                                    value={paymentData.amount}
-                                    onChange={handlePaymentInputChange}
-                                    className="payment-form-input"
-                                    placeholder="Enter amount"
-                                    min="1"
-                                    step="1"
-                                />
-
-                                <div className="payment-amount-suggestions">
-                                    <button
-                                        type="button"
-                                        className="payment-amount-btn"
-                                        onClick={() => handleQuickAmount(customer?.arrears || '', 'arrears')}
-                                    >
-                                        Arrears: {formatCurrency(customer?.arrears)}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="payment-amount-btn"
-                                        onClick={() => handleQuickAmount(customer?.loanBalance || '', 'fullBalance')}
-                                    >
-                                        Full Balance: {formatCurrency(customer?.loanBalance)}
-                                    </button>
-                                </div>
-                                
-                                <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.5rem', padding: '0.5rem', background: '#f8f9fa', borderRadius: '0.375rem' }}>
-                                    <strong>Note:</strong> Daily MPESA limit is {formatCurrency(496500)}. Amounts exceeding this will be capped.
-                                </div>
-                            </div>
-
-                            {mpesaStatus && (
-                                <div className={`mpesa-status ${mpesaStatus.status}`}>
-                                    <div className="mpesa-status-icon">
-                                        {mpesaStatus.status === 'success' ? '✅' :
-                                            mpesaStatus.status === 'failed' ? '❌' : '⏳'}
+                            {/* Failed Message */}
+                            {mpesaStatus && mpesaStatus.status === 'failed' && (
+                                <div className="mpesa-status-inline-customer failed">
+                                    <div className="mpesa-status-icon-customer">❌</div>
+                                    <div className="mpesa-status-content-customer">
+                                        <div className="mpesa-status-message-customer">{mpesaStatus.message}</div>
+                                        {mpesaStatus.details && (
+                                            <div className="mpesa-status-details-customer">{mpesaStatus.details}</div>
+                                        )}
                                     </div>
-                                    <div className="mpesa-status-message">{mpesaStatus.message}</div>
-                                    {mpesaStatus.checkoutId && (
-                                        <div className="mpesa-status-details">
-                                            Transaction ID: {mpesaStatus.checkoutId}
-                                            <br />
-                                            Phone Used: {mpesaStatus.phoneUsed}
+                                </div>
+                            )}
+
+                            {/* Only show form if payment hasn't been successfully initiated */}
+                            {(!mpesaStatus || mpesaStatus.status !== 'success') ? (
+                                <>
+                                    <div className="payment-info-container-customer">
+                                        <div className="payment-info-item-customer">
+                                            <span className="payment-info-label-customer">Customer:</span>
+                                            <span className="payment-info-value-customer">{customer?.name}</span>
                                         </div>
-                                    )}
+                                    </div>
+
+                                    <div className="payment-form-group-customer">
+                                        <label className="payment-form-label-customer">Primary Phone Number</label>
+                                        <input
+                                            type="text"
+                                            name="phoneNumber"
+                                            value={paymentData.phoneNumber}
+                                            onChange={handlePaymentInputChange}
+                                            className="payment-form-input-customer"
+                                            placeholder="2547XXXXXXXX"
+                                            maxLength="12"
+                                            disabled={paymentData.useAlternativeNumber || paymentInitiated}
+                                        />
+                                        <div className="phone-number-note-customer">
+                                            Customer's registered phone number
+                                        </div>
+                                    </div>
+
+                                    {/* Alternative Phone Number Section */}
+                                    <div className="payment-form-group-customer">
+                                        <div className="checkbox-container-customer">
+                                            <input
+                                                type="checkbox"
+                                                id="useAlternativeNumber"
+                                                name="useAlternativeNumber"
+                                                checked={paymentData.useAlternativeNumber}
+                                                onChange={handlePaymentInputChange}
+                                                className="checkbox-input-customer"
+                                                disabled={paymentInitiated}
+                                            />
+                                            <label htmlFor="useAlternativeNumber" className="checkbox-label-customer">
+                                                Use Alternative Phone Number
+                                            </label>
+                                        </div>
+
+                                        <div className={`alternative-input-container-customer ${paymentData.useAlternativeNumber ? 'active' : 'disabled'}`}>
+                                            <label className="payment-form-label-customer">Alternative Phone Number (254XXXXXXXXX)</label>
+                                            <input
+                                                type="text"
+                                                name="alternativePhoneNumber"
+                                                value={paymentData.alternativePhoneNumber}
+                                                onChange={handlePaymentInputChange}
+                                                className="payment-form-input-customer"
+                                                placeholder="2547XXXXXXXX"
+                                                maxLength="12"
+                                                disabled={!paymentData.useAlternativeNumber || paymentInitiated}
+                                            />
+                                            <div className="alternative-number-note-customer">
+                                                Use if primary number has insufficient funds
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="payment-form-group-customer">
+                                        <label className="payment-form-label-customer">Amount (KES)</label>
+                                        <input
+                                            type="number"
+                                            name="amount"
+                                            value={paymentData.amount}
+                                            onChange={handlePaymentInputChange}
+                                            className="payment-form-input-customer"
+                                            placeholder="Enter amount"
+                                            min="1"
+                                            step="1"
+                                            disabled={paymentInitiated}
+                                        />
+
+                                        <div className="payment-amount-suggestions-customer">
+                                            <button
+                                                type="button"
+                                                className="payment-amount-btn-customer"
+                                                onClick={() => handleQuickAmount(customer?.arrears || '', 'arrears')}
+                                                disabled={paymentInitiated}
+                                            >
+                                                Arrears: {formatCurrency(customer?.arrears)}
+                                            </button>
+
+                                            {/* Full Balance button with popup container */}
+                                            <div className="full-balance-button-container">
+                                                <button
+                                                    type="button"
+                                                    className="payment-amount-btn-customer"
+                                                    onClick={() => handleQuickAmount(customer?.loanBalance || '', 'fullBalance')}
+                                                    style={{ width: '100%' }}
+                                                    disabled={paymentInitiated}
+                                                >
+                                                    Full Balance: {formatCurrency(customer?.loanBalance)}
+                                                </button>
+
+                                                {/* Full Balance Popup - Attached to Button */}
+                                                {showFullBalancePopup && (
+                                                    <div className="full-balance-popup-attached">
+                                                        <div className="popup-content-attached">
+                                                            <Typography className="popup-message-attached">
+                                                                Are you sure you want to clear the full balance?
+                                                            </Typography>
+                                                            <div className="popup-actions-attached">
+                                                                <button
+                                                                    className="popup-cancel-btn-attached"
+                                                                    onClick={() => setShowFullBalancePopup(false)}
+                                                                >
+                                                                    No
+                                                                </button>
+                                                                <button
+                                                                    className="popup-confirm-btn-attached"
+                                                                    onClick={confirmFullBalanceFromPopup}
+                                                                >
+                                                                    Yes
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="daily-limit-info-customer">
+                                            <strong>Note:</strong> Daily MPESA limit is {formatCurrency(496500)}. Amounts exceeding this will be capped.
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                // Show only success message when payment is successful
+                                <div className="payment-success-content-customer">
+                                    <div className="success-checkmark-customer">✓</div>
+                                    <Typography className="success-title-customer">
+                                        Payment Request Sent Successfully
+                                    </Typography>
+                                    <Typography className="success-details-customer">
+                                        A payment prompt has been sent to {mpesaStatus?.phoneUsed || 'customer'}.<br />
+                                        Waiting for customer to enter PIN...
+                                    </Typography>
+                                    <div className="success-info-box-customer">
+                                        <div className="success-info-item-customer">
+                                            <span className="success-info-label-customer">Amount:</span>
+                                            <span className="success-info-value-customer">{formatCurrency(paymentData.amount)}</span>
+                                        </div>
+                                        <div className="success-info-item-customer">
+                                            <span className="success-info-label-customer">Phone Number:</span>
+                                            <span className="success-info-value-customer">{mpesaStatus?.phoneUsed}</span>
+                                        </div>
+                                        <div className="success-info-item-customer">
+                                            <span className="success-info-label-customer">Reference:</span>
+                                            <span className="success-info-value-customer">{mpesaStatus?.checkoutId || 'Pending...'}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="payment-modal-footer">
+                        {/* MODAL FOOTER - UPDATED FOR TWO BUTTONS */}
+                        <div className="payment-modal-footer-customer">
+                            {/* Always show Close button - different label based on state */}
                             <button
-                                className="payment-modal-cancel-btn"
-                                onClick={() => {
-                                    setShowPaymentModal(false);
-                                    setMpesaStatus(null);
-                                }}
-                                disabled={processingPayment}
+                                className="payment-modal-cancel-btn-customer"
+                                onClick={closePaymentModal}
                             >
-                                Cancel
+                                Close
                             </button>
-                            <button
-                                className="payment-modal-prompt-btn"
-                                onClick={handleSendPrompt}
-                                disabled={processingPayment || !paymentData.phoneNumber || !paymentData.amount}
-                            >
-                                {processingPayment ? 'Processing...' : 'Initiate Payment'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
-            {/* Full Balance Confirmation Alert */}
-            {showFullBalanceAlert && (
-                <div className="payment-modal-overlay">
-                    <div className="confirmation-modal" style={{ maxWidth: '350px' }}>
-                        <div className="confirmation-modal-header">
-                            <Typography className="confirmation-modal-title" style={{ color: '#dc2626' }}>
-                                Confirm Full Balance Payment
-                            </Typography>
-                        </div>
-                        
-                        <div className="confirmation-modal-body">
-                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                                <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>⚠️</div>
-                                <Typography style={{ fontWeight: '600', color: '#3c2a1c', marginBottom: '0.5rem' }}>
-                                    Are you sure you want to clear the full balance?
-                                </Typography>
-                                <Typography style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
-                                    Amount: <strong>{formatCurrency(customer?.loanBalance)}</strong>
-                                </Typography>
-                                
-                                {parseFloat(customer?.loanBalance || 0) > 496500 && (
-                                    <div style={{ 
-                                        background: '#fef2f2', 
-                                        padding: '0.75rem', 
-                                        borderRadius: '0.5rem',
-                                        border: '1px solid #fecaca',
-                                        marginBottom: '1rem'
-                                    }}>
-                                        <Typography style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: '600' }}>
-                                            ⚠️ Daily Limit Alert
-                                        </Typography>
-                                        <Typography style={{ fontSize: '0.75rem', color: '#92400e' }}>
-                                            This amount exceeds the daily MPESA limit of {formatCurrency(496500)}. 
-                                            Only {formatCurrency(496500)} can be collected at once.
-                                        </Typography>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <div className="confirmation-modal-footer">
-                            <button
-                                className="confirmation-modal-cancel-btn"
-                                onClick={() => setShowFullBalanceAlert(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="confirmation-modal-confirm-btn"
-                                onClick={confirmFullBalancePayment}
-                                style={{ background: '#dc2626' }}
-                            >
-                                Yes, Continue
-                            </button>
+                            {/* Show Processing button when payment is being processed OR after successful initiation */}
+                            {(processingPayment || (mpesaStatus && mpesaStatus.status === 'success')) && (
+                                <button
+                                    className="payment-modal-processing-btn-customer"
+                                    disabled={true}
+                                >
+                                    <div className="processing-spinner"></div>
+                                    Processing...
+                                </button>
+                            )}
+
+                            {/* Show Initiate Payment button only when form is visible and not in processing/success state */}
+                            {(!mpesaStatus || mpesaStatus.status !== 'success') && !processingPayment && (
+                                <button
+                                    className="payment-modal-prompt-btn-customer"
+                                    onClick={handleSendPrompt}
+                                    disabled={!paymentData.phoneNumber || !paymentData.amount || paymentInitiated}
+                                    style={{
+                                        backgroundColor: paymentInitiated ? '#cccccc' : '',
+                                        color: paymentInitiated ? '#666666' : '',
+                                        cursor: paymentInitiated ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {paymentInitiated ? 'Payment Initiated' : 'Initiate Payment'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1408,85 +1510,62 @@ const CustomerDetails = () => {
 
             {/* Confirmation Modal */}
             {showConfirmationModal && (
-                <div className="payment-modal-overlay">
-                    <div className="confirmation-modal">
-                        <div className="confirmation-modal-header">
-                            <div className="confirmation-modal-icon">
-                                <img 
-                                    src="/images/mpesa-logo2.png" 
-                                    alt="MPESA" 
-                                    className="mpesa-logo-image"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.style.display = 'none';
-                                        // Fallback to text if image fails to load
-                                        const parent = e.target.parentElement;
-                                        const textDiv = document.createElement('div');
-                                        textDiv.className = 'mpesa-logo-text';
-                                        textDiv.textContent = 'MPESA';
-                                        parent.appendChild(textDiv);
-                                    }}
-                                />
+                <div className="payment-modal-overlay-customer">
+                    <div className="confirmation-modal-customer">
+                        <div className="confirmation-modal-header-customer">
+                            <div className="confirmation-modal-icon-customer">
+                                <div className="mpesa-logo-text-customer">MPESA</div>
                             </div>
-                            <Typography className="confirmation-modal-title">
+                            <Typography className="confirmation-modal-title-customer">
                                 Confirm Payment Request
                             </Typography>
                         </div>
 
-                        <div className="confirmation-modal-body">
-                            <div className="confirmation-info">
-                                <div style={{ 
-                                    fontSize: '0.6875rem', 
-                                    color: '#666', 
-                                    marginBottom: '0.125rem' 
-                                }}>
+                        <div className="confirmation-modal-body-customer">
+                            <div className="confirmation-info-customer">
+                                <div className="confirmation-label-customer">
                                     {paymentData.useAlternativeNumber ? 'Alternative Phone Number:' : 'Phone Number:'}
                                 </div>
-                                <div className="confirmation-phone">
+                                <div className="confirmation-phone-customer">
                                     {paymentData.useAlternativeNumber ? paymentData.alternativePhoneNumber : paymentData.phoneNumber}
                                     {paymentData.useAlternativeNumber && (
-                                        <div style={{ fontSize: '0.625rem', color: '#666', marginTop: '0.25rem' }}>
+                                        <div className="alternative-original-note-customer">
                                             (Alternative to: {paymentData.phoneNumber})
                                         </div>
                                     )}
                                 </div>
-                                <div style={{ 
-                                    fontSize: '0.6875rem', 
-                                    color: '#666', 
-                                    marginTop: '0.75rem', 
-                                    marginBottom: '0.125rem' 
-                                }}>
+                                <div className="confirmation-label-customer">
                                     Amount:
                                 </div>
-                                <div className="confirmation-amount">
+                                <div className="confirmation-amount-customer">
                                     {formatCurrency(paymentData.amount)}
                                     {parseFloat(paymentData.amount) > 496500 && (
-                                        <div style={{ fontSize: '0.625rem', color: '#dc2626', marginTop: '0.25rem', fontWeight: '600' }}>
+                                        <div className="daily-limit-warning-customer">
                                             ⚠️ Daily limit applied: {formatCurrency(496500)}
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="confirmation-note">
+                            <div className="confirmation-note-customer">
                                 <strong>Note:</strong> Customer will receive a payment prompt on their phone and must enter their PIN to complete the transaction.
                                 {parseFloat(paymentData.amount) > 496500 && (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: '#fef2f2', borderRadius: '0.25rem' }}>
+                                    <div className="daily-limit-alert-customer">
                                         <strong>⚠️ Daily Limit:</strong> Only {formatCurrency(496500)} can be collected at once (MPESA daily limit).
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="confirmation-modal-footer">
+                        <div className="confirmation-modal-footer-customer">
                             <button
-                                className="confirmation-modal-cancel-btn"
+                                className="confirmation-modal-cancel-btn-customer"
                                 onClick={() => setShowConfirmationModal(false)}
                             >
                                 Cancel
                             </button>
                             <button
-                                className="confirmation-modal-confirm-btn"
+                                className="confirmation-modal-confirm-btn-customer"
                                 onClick={handleConfirmPayment}
                             >
                                 Send Request
