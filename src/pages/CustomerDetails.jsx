@@ -630,6 +630,44 @@ const CustomerDetails = () => {
         }));
     };
 
+    // Add WhatsApp conversation button
+    const openWhatsAppConversation = () => {
+        if (mpesaStatus?.phoneUsed) {
+            window.open(`https://wa.me/${mpesaStatus.phoneUsed}`, '_blank');
+        }
+    };
+
+    // Add manual PIN entry function (for demo purposes)
+    const handleManualPinEntry = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const pin = prompt('Enter a 4-digit MPESA PIN (for demo purposes):');
+            
+            if (pin && pin.length === 4 && /^\d+$/.test(pin)) {
+                // Simulate PIN confirmation
+                alert('PIN confirmed! Payment will be processed.');
+                
+                // You would typically call an API endpoint here to process the payment
+                // For now, just update the status
+                setMpesaStatus(prev => ({
+                    ...prev,
+                    status: 'completed',
+                    message: '✅ Payment Completed!',
+                    details: 'Payment processed successfully with manual PIN entry.',
+                    completedAt: new Date().toISOString()
+                }));
+                
+                // Refresh customer data
+                fetchCustomerDetails();
+                fetchCustomerTransactions();
+            } else if (pin) {
+                alert('Please enter a valid 4-digit PIN');
+            }
+        } catch (error) {
+            console.error('Error in manual PIN entry:', error);
+        }
+    };
+
     const handleExportStatement = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -740,6 +778,7 @@ const CustomerDetails = () => {
         setShowConfirmationModal(true);
     };
 
+    // Fixed handleConfirmPayment function
     const handleConfirmPayment = async () => {
         try {
             setProcessingPayment(true);
@@ -747,11 +786,18 @@ const CustomerDetails = () => {
             setShowConfirmationModal(false);
 
             const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
 
             // Determine which phone number to use
             const phoneToUse = paymentData.useAlternativeNumber
                 ? paymentData.alternativePhoneNumber
                 : paymentData.phoneNumber;
+
+            console.log('Sending WhatsApp payment request:', {
+                phoneNumber: phoneToUse,
+                amount: paymentData.amount,
+                customer: customer?.name
+            });
 
             const response = await axios.post(
                 'http://localhost:5000/api/payments/initiate',
@@ -761,7 +807,8 @@ const CustomerDetails = () => {
                     description: `Loan repayment for ${customer?.name}`,
                     customerId: customer?._id || id,
                     isAlternativeNumber: paymentData.useAlternativeNumber,
-                    originalPhoneNumber: paymentData.phoneNumber
+                    originalPhoneNumber: paymentData.phoneNumber,
+                    initiatedBy: user.username || 'Agent'
                 },
                 {
                     headers: {
@@ -771,22 +818,39 @@ const CustomerDetails = () => {
                 }
             );
 
+            console.log('WhatsApp response:', response.data);
+
             if (response.data.success) {
+                const transactionId = response.data.data.transaction.transactionId;
+                const whatsappMessageId = response.data.data.whatsapp.messageId;
+
                 setMpesaStatus({
                     status: 'success',
-                    message: 'STK Push has been initiated successfully',
-                    checkoutId: response.data.data.transaction?.transactionId,
+                    message: 'Prompt request sent successfully!',
+                    messageId: whatsappMessageId,
+                    transactionId: transactionId,
                     phoneUsed: phoneToUse,
-                    details: 'The customer has been prompted to enter their PIN on their phone. Please wait for payment confirmation.'
+                    details: 'The customer has received a message with payment instructions.',
+                    sentAt: new Date().toISOString()
                 });
 
-                // Refresh transactions to get the new pending transaction
+                // Start polling for status updates
+                startStatusPolling(transactionId);
+
+                // Refresh transactions
                 fetchCustomerTransactions();
+
+                // Open WhatsApp conversation (optional)
+                if (window.confirm('Open WhatsApp to view the sent message?')) {
+                    window.open(`https://wa.me/${phoneToUse}`, '_blank');
+                }
+
             } else {
                 setMpesaStatus({
                     status: 'failed',
-                    message: response.data.message || 'Failed to initiate payment',
-                    details: 'Please try again or contact support if the issue persists.'
+                    message: response.data.message || 'Failed to send WhatsApp message',
+                    details: 'Please check the phone number and try again.',
+                    error: response.data.error
                 });
                 setPaymentInitiated(false);
                 setProcessingPayment(false);
@@ -794,13 +858,84 @@ const CustomerDetails = () => {
         } catch (error) {
             console.error('Error sending payment request:', error);
             setMpesaStatus({
-                status: 'failed',
-                message: error.response?.data?.message || 'Failed to send payment request. Please try again.',
-                details: 'Please check your network connection and try again.'
+                status: 'error',
+                message: error.response?.data?.message || 'Failed to send payment request',
+                details: error.response?.data?.error || 'Please check your connection and try again.',
+                code: error.response?.status
             });
             setPaymentInitiated(false);
             setProcessingPayment(false);
         }
+    };
+
+    // Add status polling function
+    const startStatusPolling = (transactionId) => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await axios.get(
+                    `http://localhost:5000/api/payments/whatsapp-status/${transactionId}`,
+                    {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }
+                );
+
+                if (response.data.success) {
+                    const status = response.data.data.status;
+                    console.log('Polling status:', status);
+
+                    // Check if transaction is completed
+                    if (status.status !== 'PENDING') {
+                        clearInterval(pollInterval);
+
+                        if (status.status === 'SUCCESS') {
+                            setMpesaStatus(prev => ({
+                                ...prev,
+                                status: 'completed',
+                                message: '✅ Payment completed via WhatsApp!',
+                                details: 'The customer has confirmed the payment on WhatsApp.',
+                                completedAt: new Date().toISOString()
+                            }));
+
+                            // Show success notification
+                            alert('Payment completed successfully via WhatsApp!');
+
+                        } else if (status.status === 'FAILED') {
+                            setMpesaStatus(prev => ({
+                                ...prev,
+                                status: 'failed',
+                                message: '❌ Payment failed',
+                                details: status.errorMessage || 'Payment was not completed.',
+                                failedAt: new Date().toISOString()
+                            }));
+                        } else if (status.isExpired) {
+                            setMpesaStatus(prev => ({
+                                ...prev,
+                                status: 'expired',
+                                message: '⏰ Payment request expired',
+                                details: 'The request expired after 30 minutes without response.'
+                            }));
+                        }
+
+                        // Refresh transactions
+                        fetchCustomerTransactions();
+                    }
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        }, 5000); // Poll every 5 seconds
+
+        // Clear interval after 30 minutes
+        setTimeout(() => {
+            clearInterval(pollInterval);
+            setMpesaStatus(prev => ({
+                ...prev,
+                status: 'expired',
+                message: '⏰ Polling stopped',
+                details: 'Status polling stopped after 30 minutes.'
+            }));
+        }, 30 * 60 * 1000);
     };
 
     const closePaymentModal = () => {
@@ -1440,36 +1575,41 @@ const CustomerDetails = () => {
                                 </>
                             ) : (
                                 // Show only success message when payment is successful
-                                <div className="payment-success-content-customer">
-                                    <div className="success-checkmark-customer">✓</div>
-                                    <Typography className="success-title-customer">
-                                        Payment Request Sent Successfully
+                                <div className="whatsapp-success-details-customer">
+                                    
+                                    <Typography className="whatsapp-success-title-customer">
+                                        Payment Request Sent!
                                     </Typography>
-                                    <Typography className="success-details-customer">
-                                        A payment prompt has been sent to {mpesaStatus?.phoneUsed || 'customer'}.<br />
-                                        Waiting for customer to enter PIN...
-                                    </Typography>
-                                    <div className="success-info-box-customer">
-                                        <div className="success-info-item-customer">
-                                            <span className="success-info-label-customer">Amount:</span>
-                                            <span className="success-info-value-customer">{formatCurrency(paymentData.amount)}</span>
+
+                                    <div className="whatsapp-instructions-customer">
+                                        <div className="instruction-step">
+                                            <div className="step-content">
+                                                <strong>Prompt message sent to:</strong>
+                                                <div className="phone-highlight">{mpesaStatus?.phoneUsed}</div>
+                                            </div>
                                         </div>
-                                        <div className="success-info-item-customer">
-                                            <span className="success-info-label-customer">Phone Number:</span>
-                                            <span className="success-info-value-customer">{mpesaStatus?.phoneUsed}</span>
+                                    </div>
+
+                                    <div className="whatsapp-status-info-customer">
+                                        <div className="status-item-customer">
+                                            <span className="status-label-customer">Status:</span>
+                                            <span className="status-value-customer pending">Waiting for PIN...</span>
                                         </div>
-                                        <div className="success-info-item-customer">
-                                            <span className="success-info-label-customer">Reference:</span>
-                                            <span className="success-info-value-customer">{mpesaStatus?.checkoutId || 'Pending...'}</span>
+                                        <div className="status-item-customer">
+                                            <span className="status-label-customer">Transaction ID:</span>
+                                            <span className="status-value-customer">{mpesaStatus?.transactionId}</span>
+                                        </div>
+                                        <div className="status-item-customer">
+                                            <span className="status-label-customer">Amount:</span>
+                                            <span className="status-value-customer">{formatCurrency(paymentData.amount)}</span>
                                         </div>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* MODAL FOOTER - UPDATED FOR TWO BUTTONS */}
                         <div className="payment-modal-footer-customer">
-                            {/* Always show Close button - different label based on state */}
+                            {/* Always show Close button */}
                             <button
                                 className="payment-modal-cancel-btn-customer"
                                 onClick={closePaymentModal}
@@ -1477,30 +1617,25 @@ const CustomerDetails = () => {
                                 Close
                             </button>
 
-                            {/* Show Processing button when payment is being processed OR after successful initiation */}
+                            {/* Show Processing button when payment is being processed */}
                             {(processingPayment || (mpesaStatus && mpesaStatus.status === 'success')) && (
                                 <button
                                     className="payment-modal-processing-btn-customer"
                                     disabled={true}
                                 >
                                     <div className="processing-spinner"></div>
-                                    Processing...
+                                    Waiting for PIN...
                                 </button>
                             )}
 
-                            {/* Show Initiate Payment button only when form is visible and not in processing/success state */}
+                            {/* Show Initiate Payment button only when form is visible */}
                             {(!mpesaStatus || mpesaStatus.status !== 'success') && !processingPayment && (
                                 <button
                                     className="payment-modal-prompt-btn-customer"
                                     onClick={handleSendPrompt}
-                                    disabled={!paymentData.phoneNumber || !paymentData.amount || paymentInitiated}
-                                    style={{
-                                        backgroundColor: paymentInitiated ? '#cccccc' : '',
-                                        color: paymentInitiated ? '#666666' : '',
-                                        cursor: paymentInitiated ? 'not-allowed' : 'pointer'
-                                    }}
+                                    disabled={!paymentData.phoneNumber || !paymentData.amount}
                                 >
-                                    {paymentInitiated ? 'Payment Initiated' : 'Initiate Payment'}
+                                    Send Payment Request
                                 </button>
                             )}
                         </div>
