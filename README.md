@@ -1,7 +1,7 @@
-# Kollects - Loan Collection Management System
+# Rekova
 
 ## Overview
-**Collects** is a full-stack loan collection management system designed to help financial institutions manage customer loans, track repayments, and streamline collection processes.
+**Rekova** is a loan collection management system designed to help financial institutions manage customer loans, track repayments, and streamline collection processes.
 
 ## Core Features
 | Feature | Description |
