@@ -1,4 +1,4 @@
-// src/App.jsx - FINAL WORKING VERSION
+// src/App.jsx - UPDATED TO FIX GAP ISSUE
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
@@ -17,6 +17,7 @@ import './styles/auth.css';
 import './styles/sidebar.css';
 import './styles/navbar.css';
 import './styles/dashboard.css';
+import './App.css'; // Add this line - create App.css for layout styles
 
 // Protected Layout component
 const ProtectedLayout = ({ children }) => {
@@ -27,23 +28,14 @@ const ProtectedLayout = ({ children }) => {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="app-container">
       <Sidebar
         onMenuToggle={toggleSidebar}
         user={authService.getCurrentUser()}
       />
-      <div style={{
-        flex: 1,
-        marginLeft: sidebarCollapsed ? '80px' : '280px',
-        transition: 'margin-left 0.3s ease'
-      }}>
+      <div className={`main-content-wrapper ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <Navbar onMenuToggle={toggleSidebar} />
-        <main style={{
-          marginTop: '70px',
-          padding: '20px',
-          minHeight: 'calc(100vh - 70px)',
-          backgroundColor: '#f8f9fa'
-        }}>
+        <main className="main-content">
           {children}
         </main>
       </div>

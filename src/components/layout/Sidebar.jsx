@@ -1,4 +1,4 @@
-// src/components/layout/Sidebar.jsx - WITH MATERIAL UI ICONS
+// src/components/layout/Sidebar.jsx - UPDATED WITH CENTURY GOTHIC
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -57,14 +57,14 @@ const Sidebar = ({ onMenuToggle }) => {
 
   return (
     <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
-      {/* Logo Section - Compact */}
+      {/* Logo Section - Slightly Reduced */}
       <div className="sidebar-logo">
         <div className="logo-icon">
-          <span className="logo-text">K</span>
+          <span className="logo-text">R</span>
         </div>
         {!collapsed && (
           <div className="logo-text-container">
-            <h3>Kollect</h3>
+            <h3>Rekova</h3>
             <p className="logo-subtitle">Collections Portal</p>
           </div>
         )}
@@ -76,7 +76,7 @@ const Sidebar = ({ onMenuToggle }) => {
         </button>
       </div>
 
-      {/* Menu Items - Compact */}
+      {/* Menu Items - Improved Readability */}
       <nav className="sidebar-nav">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path || 

@@ -8,20 +8,18 @@ import {
 import {
   AccountBalanceWallet,
   People,
-  AttachMoney,
   Receipt,
   Refresh,
-  TrendingUp,
-  TrendingDown,
-  TrendingFlat,
   Payment,
   Assessment,
   ReceiptLong,
-  PersonAdd,
   ArrowForward,
   LibraryAdd,
   LibraryAddCheck,
-  PeopleAlt
+  PeopleAlt,
+  CheckCircle,
+  Cancel,
+  AccessTime
 } from "@mui/icons-material";
 import axios from "axios";
 import authService from "../services/auth.service";
@@ -30,7 +28,7 @@ import "../styles/dashboard.css";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  const [recentCustomers, setRecentCustomers] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -52,13 +50,13 @@ const Dashboard = () => {
 
       const api = getApi();
       
-      const [statsRes, customersRes] = await Promise.all([
+      const [statsRes, transactionsRes] = await Promise.all([
         api.get("/customers/dashboard/stats"),
-        api.get("/customers?limit=5")
+        api.get("/payments/recent-transactions") // NEW ENDPOINT
       ]);
 
       setStats(statsRes.data.data.stats);
-      setRecentCustomers(customersRes.data.data.customers || []);
+      setRecentTransactions(transactionsRes.data.data.transactions || []);
     } catch (err) {
       console.error("Dashboard error:", err.response?.data || err.message);
       setError(err.response?.data?.message || "Failed to load dashboard data");
@@ -161,32 +159,61 @@ const Dashboard = () => {
     }
   ];
 
-  // Format arrears amount
-  const formatArrears = (amount) => {
-    const numAmount = Number(amount || 0);
-    return numAmount === 0 ? "KES 0" : `KES ${numAmount.toLocaleString()}`;
+  // Get status icon and color
+  const getStatusIcon = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'SUCCESS':
+        return <CheckCircle sx={{ fontSize: 14, color: '#2ecc71' }} />;
+      case 'FAILED':
+        return <Cancel sx={{ fontSize: 14, color: '#e74c3c' }} />;
+      case 'PENDING':
+        return <AccessTime sx={{ fontSize: 14, color: '#f39c12' }} />;
+      case 'EXPIRED':
+        return <Cancel sx={{ fontSize: 14, color: '#95a5a6' }} />;
+      case 'CANCELLED':
+        return <Cancel sx={{ fontSize: 14, color: '#7f8c8d' }} />;
+      default:
+        return <AccessTime sx={{ fontSize: 14, color: '#f39c12' }} />;
+    }
   };
 
-  // Handle customer navigation - FIXED FOR MONGODB
-  const handleCustomerClick = (customer) => {
-    console.log("Customer clicked:", customer);
-    console.log("Available ID fields:", {
-      _id: customer._id,
-      customerId: customer.customerId,
-      id: customer.id
-    });
-    
-    // MongoDB uses _id, not id
-    const customerId = customer._id || customer.customerId;
-    
-    if (!customerId) {
-      console.error("No valid ID found for customer:", customer);
-      alert("Error: Could not find customer ID");
-      return;
+  // Get status text color
+  const getStatusColor = (status) => {
+    switch (status?.toUpperCase()) {
+      case 'SUCCESS': return '#2ecc71';
+      case 'FAILED': return '#e74c3c';
+      case 'PENDING': return '#f39c12';
+      case 'EXPIRED': return '#95a5a6';
+      case 'CANCELLED': return '#7f8c8d';
+      default: return '#f39c12';
     }
-    
-    console.log(`Navigating to: /customers/${customerId}`);
-    navigate(`/customers/${customerId}`);
+  };
+
+  // Format amount
+  const formatAmount = (amount) => {
+    const numAmount = Number(amount || 0);
+    return `KES ${numAmount.toLocaleString()}`;
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-KE', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  // Handle transaction click
+  const handleTransactionClick = (transaction) => {
+    navigate(`/transactions/${transaction._id}`);
   };
 
   return (
@@ -195,11 +222,8 @@ const Dashboard = () => {
       <Box className="dashboard-header">
         <Box className="header-content">
           <Box>
-            <Typography className="dashboard-title">
-              Collections Dashboard
-            </Typography>
             <Typography className="dashboard-subtitle">
-              Overview of loan portfolio and collections
+              Overview of Arrears Portfolio & Collections
             </Typography>
           </Box>
           <button 
@@ -232,36 +256,36 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Horizontal Layout: Recent Customers (65%) + Quick Actions (35%) */}
+      {/* Horizontal Layout: Recent Transactions (65%) + Quick Actions (35%) */}
       <Box className="dashboard-main">
-        {/* Recent Customers Section - 65% */}
+        {/* Recent Transactions Section - 65% */}
         <Box className="recent-customers-section">
           <div className="recent-customers-card">
             <div className="section-header">
               <Typography className="section-title">
-                Recent Customers
+                Recent Transactions
               </Typography>
               <button 
                 className="view-all-btn"
-                onClick={() => navigate('/customers')}
+                onClick={() => navigate('/transactions')}
               >
-                View All <ArrowForward sx={{ fontSize: 14, ml: 0.5 }} />
+                View All
               </button>
             </div>
             
             <div className="customers-list">
-              {recentCustomers.length === 0 ? (
+              {recentTransactions.length === 0 ? (
                 <div className="customers-empty-state">
-                  <div className="empty-icon">👥</div>
+                  <div className="empty-icon">💳</div>
                   <Typography className="empty-title">
-                    No Customers Found
+                    No Recent Transactions
                   </Typography>
                   <Typography className="empty-subtitle">
-                    Start by adding your first customer
+                    Process a payment to see transactions here
                   </Typography>
                   <Button
                     variant="contained"
-                    onClick={() => navigate('/customers/new')}
+                    onClick={() => navigate('/payments')}
                     sx={{
                       background: '#5c4730',
                       color: 'white',
@@ -271,31 +295,37 @@ const Dashboard = () => {
                       '&:hover': { background: '#3c2a1c' }
                     }}
                   >
-                    Add Customer
+                    Process Payment
                   </Button>
                 </div>
               ) : (
-                recentCustomers.map((customer, index) => (
+                recentTransactions.map((transaction, index) => (
                   <div 
-                    key={customer._id || index} 
+                    key={transaction._id || index} 
                     className="customer-row"
-                    onClick={() => handleCustomerClick(customer)}
+                    onClick={() => handleTransactionClick(transaction)}
                     style={{ cursor: 'pointer' }}
                   >
                     <div className="customer-info">
                       <Typography className="customer-name">
-                        {customer.name || 'Unknown Customer'}
+                        {transaction.customerId?.name || 'Unknown Customer'}
                       </Typography>
                       <Typography className="customer-phone">
-                        {customer.phoneNumber || 'N/A'}
+                        {transaction.phoneNumber || 'N/A'}
+                      </Typography>
+                      <Typography className="transaction-date" style={{ fontSize: '0.7rem', color: '#666' }}>
+                        {formatDate(transaction.createdAt)}
                       </Typography>
                     </div>
                     <div className="arrears-info">
-                      <Typography className="arrears-amount">
-                        {formatArrears(customer.arrears)}
+                      <Typography className="arrears-amount" style={{ color: getStatusColor(transaction.status) }}>
+                        {formatAmount(transaction.amount)}
+                        <span style={{ marginLeft: '6px' }}>
+                          {getStatusIcon(transaction.status)}
+                        </span>
                       </Typography>
-                      <Typography className="arrears-label">
-                        Arrears to Clear
+                      <Typography className="arrears-label" style={{ color: getStatusColor(transaction.status) }}>
+                        {transaction.status || 'PENDING'}
                       </Typography>
                     </div>
                   </div>

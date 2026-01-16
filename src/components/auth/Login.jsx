@@ -1,6 +1,7 @@
 // src/components/Auth/Login.jsx - Clean with Subtle Fill Animation
 import React, { useState } from 'react';
 import '../../../src/styles/components.css';
+import Typography from '@mui/material/Typography';
 
 const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
   const [username, setUsername] = useState('');
@@ -35,7 +36,21 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
               <div className="kollect-money-fill-container">
                 {/* Main icon container */}
                 <div className="kollect-money-icon">
-                  <div className="kollect-money-symbol">💰</div>
+                  <div className="kollect-money-symbol">
+                    <Typography
+                      variant="h1"
+                      sx={{
+                        fontSize: '65px',
+                        fontWeight: 700,
+                        color: '#ffffffff',
+                        fontFamily: "'Roboto', sans-serif",
+                        textShadow: '2px 2px 4px rgba(0,0,0,0.2)',
+                        lineHeight: 1
+                      }}
+                    >
+                      R
+                    </Typography>
+                  </div>
                 </div>
 
                 {/* Subtle fill animation only */}
@@ -48,7 +63,7 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
               </div>
             </div>
             <div className="kollect-century-brand">
-              <h1 className="kollect-century-title">Kollect</h1>
+              <h1 className="kollect-century-title">Rekova</h1>
               <p className="kollect-century-subtitle">Collections Portal</p>
             </div>
           </div>
@@ -76,7 +91,7 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
+                  placeholder="Enter your username or email"
                   required
                   disabled={loading}
                   autoFocus
@@ -127,7 +142,7 @@ const Login = ({ onLogin, loading, error, backendStatus = 'connected' }) => {
 
               <div className="kollect-century-footer">
                 <div className="kollect-century-footer-content">
-                  <span className="kollect-century-footer-text">Kollect v1.0</span>
+                  <span className="kollect-century-footer-text">Rekova v1.0</span>
                   <span className="kollect-century-footer-separator">•</span>
                   <span className="kollect-century-footer-text">Secure Banking</span>
                 </div>

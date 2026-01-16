@@ -1,16 +1,23 @@
-/* src/styles/dashboard.css - UPDATED WITH MINIMAL PADDING */
+/* src/styles/dashboard.css - FULL UPDATED VERSION */
+
 .dashboard-wrapper {
   min-height: calc(100vh - 70px);
-  padding: 1.25rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  padding: 1.5rem;
+  font-family: 'Century Gothic', 'CenturyGothic', 'AppleGothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif !important;
   background: #f8f9fa;
   width: 100%;
   box-sizing: border-box;
+  margin: 0;
 }
 
-/* Header - BOLDER */
+/* Ensure all text uses Century Gothic */
+.dashboard-wrapper * {
+  font-family: 'Century Gothic', 'CenturyGothic', 'AppleGothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif !important;
+}
+
+/* Header - Ultra Minimal */
 .dashboard-header {
-  margin-bottom: 1.875rem;
+  margin-bottom: 1rem;
   padding: 0;
   width: 100%;
 }
@@ -19,48 +26,56 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.625rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
 }
 
 .dashboard-title {
-  font-size: 1.625rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   margin: 0;
-  color: #3c2a1c;
-  letter-spacing: -0.5px;
+  color: #2c1810;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-family: 'Century Gothic' !important;
   text-transform: capitalize;
 }
 
 .dashboard-subtitle {
-  font-size: 0.875rem;
-  margin: 0.5rem 0 0 0;
+  font-size: 0.6875rem;
+  margin: 0.25rem 0 0 0;
   color: #666666;
   font-weight: 500;
+  opacity: 0.8;
+  font-family: 'Century Gothic' !important;
+  letter-spacing: 0.1px;
 }
 
 /* Minimal Stats Grid */
 .minimal-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.875rem;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
   width: 100%;
 }
 
 .minimal-stat-card {
-  border-radius: 0.75rem;
-  border: 1px solid rgba(92, 71, 48, 0.1);
-  padding: 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(92, 71, 48, 0.08);
+  padding: 1rem;
   background: white;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
   height: 100%;
-  min-height: 7.5rem;
+  min-height: 6rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  font-family: 'Century Gothic' !important;
 }
 
 .minimal-stat-card::before {
@@ -69,349 +84,535 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 0.1875rem;
+  height: 0.125rem;
   background: linear-gradient(90deg, #d4a762, #5c4730);
+  opacity: 0.8;
 }
 
 .minimal-stat-card:hover {
   transform: translateY(-0.125rem);
-  box-shadow: 0 0.375rem 1.25rem rgba(92, 71, 48, 0.08);
-  border-color: rgba(212, 167, 98, 0.3);
+  box-shadow: 0 0.25rem 0.75rem rgba(92, 71, 48, 0.05);
+  border-color: rgba(212, 167, 98, 0.2);
 }
 
 .stat-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .stat-label {
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.3px;
   margin: 0;
   color: #5c4730;
+  opacity: 1;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
 }
 
 .stat-icon-wrapper {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.625rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #5c4730, #3c2a1c);
   color: white;
   flex-shrink: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
+  transition: transform 0.15s ease;
+  font-family: 'Century Gothic' !important;
+}
+
+.minimal-stat-card:hover .stat-icon-wrapper {
+  transform: scale(1.05);
 }
 
 .stat-value {
-  font-size: 1.625rem;
-  font-weight: 800;
+  font-size: 1.125rem;
+  font-weight: 900;
   margin: 0;
-  line-height: 1.1;
+  line-height: 1;
   color: #3c2a1c;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.2px;
+  font-family: 'Century Gothic' !important;
 }
 
 /* Main Content - Horizontal Layout */
 .dashboard-main {
   display: flex;
-  gap: 1.5rem;
-  margin-top: 1.25rem;
+  gap: 1rem;
+  margin-top: 0.75rem;
   width: 100%;
 }
 
-/* Section Headers - BOLDER */
+/* Section Headers - BOLD AND PROMINENT */
 .section-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 0.125rem solid rgba(92, 71, 48, 0.15);
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 0.125rem solid rgba(92, 71, 48, 0.12);
+  font-family: 'Century Gothic' !important;
+  background: linear-gradient(to right, rgba(245, 240, 234, 0.3), transparent);
+  padding: 0.75rem 1rem;
+  margin: -1rem -1rem 1rem -1rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+  border-bottom: 0.125rem solid rgba(212, 167, 98, 0.2);
 }
 
 .section-title {
-  font-size: 1.125rem;
-  font-weight: 700;
+  font-size: 0.8125rem !important;
+  font-family: 'Century Gothic' !important;
+  font-weight: 900;
   color: #3c2a1c;
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  position: relative;
+  letter-spacing: 0.35px;
+  opacity: 1;
   display: inline-block;
+  line-height: 1.1;
+  position: relative;
+  padding-bottom: 0.375rem;
 }
 
 .section-title::after {
   content: '';
   position: absolute;
-  bottom: -1.125rem;
+  bottom: 0;
   left: 0;
-  width: 2.5rem;
-  height: 0.1875rem;
-  background: linear-gradient(90deg, #d4a762, #5c4730);
+  width: 2.25rem;
+  height: 0.175rem;
+  background: linear-gradient(90deg, #ffd166, #5c4730);
   border-radius: 0.125rem;
+  display: block !important;
 }
 
 .view-all-btn {
-  background: none;
-  border: none;
+  background: rgba(92, 71, 48, 0.1);
+  border: 1px solid rgba(92, 71, 48, 0.15);
   color: #5c4730;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.625rem;
+  font-weight: 700;
   cursor: pointer;
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.25rem;
+  transition: all 0.15s ease;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.125rem;
+  font-family: 'Century Gothic' !important;
+  opacity: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.15px;
 }
 
 .view-all-btn:hover {
-  background: rgba(92, 71, 48, 0.08);
-  color: #3c2a1c;
+  background: rgba(92, 71, 48, 0.15);
+  border-color: #d4a762;
+  transform: translateY(-0.0625rem);
+  box-shadow: 0 0.125rem 0.25rem rgba(92, 71, 48, 0.1);
 }
 
-/* Recent Customers - 65% width */
+/* Recent Transactions - 65% width */
 .recent-customers-section {
   flex: 0 0 65%;
 }
 
 .recent-customers-card {
-  border-radius: 0.75rem;
-  border: 1px solid rgba(92, 71, 48, 0.1);
-  padding: 1.75rem;
+  border-radius: 0.5rem;
+  border: 0.125rem solid rgba(92, 71, 48, 0.1);
+  padding: 1rem;
   background: white;
   height: 100%;
-  box-shadow: 0 0.125rem 0.5rem rgba(92, 71, 48, 0.05);
+  box-shadow: 0 0.125rem 0.75rem rgba(92, 71, 48, 0.08);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  min-height: 360px;
+  font-family: 'Century Gothic' !important;
 }
 
-/* Scrollable Customers List */
+/* Scrollable Transactions List */
 .customers-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.375rem;
   flex: 1;
   overflow-y: auto;
-  max-height: 25rem;
+  max-height: 17rem;
   padding-right: 0.25rem;
   scrollbar-width: thin;
-  scrollbar-color: rgba(92, 71, 48, 0.3) rgba(92, 71, 48, 0.1);
+  scrollbar-color: rgba(92, 71, 48, 0.2) rgba(92, 71, 48, 0.05);
+  font-family: 'Century Gothic' !important;
 }
 
+.customers-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.customers-list::-webkit-scrollbar-track {
+  background: rgba(92, 71, 48, 0.05);
+  border-radius: 2px;
+}
+
+.customers-list::-webkit-scrollbar-thumb {
+  background: rgba(92, 71, 48, 0.2);
+  border-radius: 2px;
+}
+
+/* COMPACT TRANSACTION ROW STYLES */
 .customer-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.125rem 1.25rem;
-  border-radius: 0.625rem;
-  background: #f8f9fa;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.375rem;
+  background: #faf9f8;
   border: 1px solid rgba(92, 71, 48, 0.08);
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   cursor: pointer;
   flex-shrink: 0;
   box-sizing: border-box;
+  font-family: 'Century Gothic' !important;
+  min-height: 3.5rem;
+  max-height: 3.75rem;
 }
 
 .customer-row:hover {
-  background: #f5f0ea;
-  border-color: rgba(212, 167, 98, 0.3);
+  background: #f8f5f0;
+  border-color: rgba(212, 167, 98, 0.25);
   transform: translateX(0.25rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(92, 71, 48, 0.05);
+  box-shadow: 0 0.125rem 0.375rem rgba(92, 71, 48, 0.05);
 }
 
 .customer-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
+/* SMALLER FONT SIZES FOR TRANSACTION DETAILS */
 .customer-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.75rem !important;
+  font-weight: 700;
   color: #3c2a1c;
-  margin-bottom: 0.375rem;
-  letter-spacing: 0.2px;
+  margin: 0;
+  letter-spacing: 0.08px;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .customer-phone {
-  font-size: 0.8125rem;
+  font-size: 0.6875rem !important;
   color: #666;
+  font-weight: 600;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+/* Transaction Date - Smaller font */
+.transaction-date {
+  font-size: 0.625rem !important;
+  color: #999;
   font-weight: 500;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
 }
 
 .arrears-info {
   text-align: right;
-  min-width: 10rem;
+  min-width: 6.5rem;
+  max-width: 7.5rem;
+  padding-left: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
 }
 
 .arrears-amount {
-  font-size: 1.125rem;
+  font-size: 0.75rem !important;
   font-weight: 700;
-  color: #c0392b;
-  margin-bottom: 0.375rem;
-  letter-spacing: 0.5px;
+  margin: 0;
+  letter-spacing: 0.15px;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+/* Status icon - smaller */
+.arrears-amount svg {
+  font-size: 12px !important;
 }
 
 .arrears-label {
-  font-size: 0.75rem;
+  font-size: 0.5625rem !important;
   color: #666;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  font-weight: 600;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
 }
 
-/* Empty State for Customers */
+/* Status Colors */
+.status-success {
+  color: #2ecc71 !important;
+}
+
+.status-failed {
+  color: #e74c3c !important;
+}
+
+.status-pending {
+  color: #f39c12 !important;
+}
+
+.status-expired {
+  color: #95a5a6 !important;
+}
+
+.status-cancelled {
+  color: #7f8c8d !important;
+}
+
+/* Empty State for Transactions */
 .customers-empty-state {
   text-align: center;
-  padding: 3.125rem 1.25rem;
+  padding: 2rem 1rem;
   background: #f8f9fa;
-  border-radius: 0.625rem;
-  border: 0.125rem dashed rgba(212, 167, 98, 0.3);
+  border-radius: 0.375rem;
+  border: 0.125rem dashed rgba(212, 167, 98, 0.2);
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  font-family: 'Century Gothic' !important;
 }
 
 .empty-icon {
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   color: #d4a762;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
 }
 
 .empty-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: #5c4730;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
+  font-family: 'Century Gothic' !important;
 }
 
 .empty-subtitle {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: #666;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
+  font-family: 'Century Gothic' !important;
+  font-weight: 500;
 }
 
-/* Quick Actions - 35% width */
+/* Quick Actions - 35% width - UPDATED COMPACT STYLING */
 .quick-actions-section {
   flex: 0 0 35%;
 }
 
 .quick-actions-card {
-  border-radius: 0.75rem;
-  border: 1px solid rgba(92, 71, 48, 0.1);
-  padding: 1.75rem;
+  border-radius: 0.5rem;
+  border: 0.125rem solid rgba(92, 71, 48, 0.1);
+  padding: 1rem;
   background: white;
   height: 100%;
-  box-shadow: 0 0.125rem 0.5rem rgba(92, 71, 48, 0.05);
+  box-shadow: 0 0.125rem 0.75rem rgba(92, 71, 48, 0.08);
   box-sizing: border-box;
+  min-height: 360px;
+  font-family: 'Century Gothic' !important;
 }
 
 .quick-actions-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.875rem;
+  gap: 0.375rem; /* Reduced from 0.625rem to match transaction rows */
 }
 
+/* COMPACT QUICK ACTION ITEMS - Matching transaction row styling */
 .quick-action-item {
   display: flex;
   align-items: center;
-  gap: 1.125rem;
-  padding: 1.125rem;
-  border-radius: 0.625rem;
-  background: #f8f9fa;
+  gap: 0.5rem; /* Reduced from 0.75rem */
+  padding: 0.5rem 0.625rem; /* Reduced from 0.75rem to match transaction rows */
+  border-radius: 0.375rem;
+  background: #faf9f8;
   border: 1px solid rgba(92, 71, 48, 0.08);
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   cursor: pointer;
   text-decoration: none;
   color: inherit;
   box-sizing: border-box;
+  font-family: 'Century Gothic' !important;
+  min-height: 3.5rem; /* Reduced from 4rem to match transaction rows */
+  max-height: 3.75rem; /* Added max-height like transaction rows */
 }
 
 .quick-action-item:hover {
-  background: #f5f0ea;
-  border-color: rgba(212, 167, 98, 0.3);
-  transform: translateX(0.375rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(92, 71, 48, 0.05);
+  background: #f8f5f0;
+  border-color: rgba(212, 167, 98, 0.25);
+  transform: translateX(0.25rem);
+  box-shadow: 0 0.125rem 0.375rem rgba(92, 71, 48, 0.05);
 }
 
+/* SMALLER ACTION ICONS */
 .action-icon {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 0.625rem;
+  width: 2rem; /* Reduced from 2.25rem */
+  height: 2rem; /* Reduced from 2.25rem */
+  border-radius: 0.5rem;
   background: linear-gradient(135deg, #5c4730, #3c2a1c);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.375rem;
+  font-size: 1rem; /* Reduced from 1.125rem */
   flex-shrink: 0;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  font-family: 'Century Gothic' !important;
 }
 
 .quick-action-item:hover .action-icon {
   background: linear-gradient(135deg, #d4a762, #5c4730);
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
+/* SMALLER ACTION LABEL */
 .action-label {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.75rem !important; /* Reduced from 0.8125rem to match customer-name */
+  font-weight: 700;
   color: #3c2a1c;
   flex: 1;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.08px; /* Matches customer-name letter-spacing */
+  font-family: 'Century Gothic' !important;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Minimal Refresh Button - BOLDER */
+/* Minimal Refresh Button */
 .minimal-refresh-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border: 1px solid rgba(92, 71, 48, 0.2);
-  border-radius: 0.5rem;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(92, 71, 48, 0.12);
+  border-radius: 0.375rem;
   background: white;
   color: #5c4730;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 0.875rem;
-  letter-spacing: 0.3px;
+  transition: all 0.15s ease;
+  font-size: 0.6875rem;
+  letter-spacing: 0.15px;
+  font-family: 'Century Gothic' !important;
+  height: 28px;
 }
 
 .minimal-refresh-btn:hover {
-  background: #f5f0ea;
+  background: #faf9f8;
   border-color: #d4a762;
   transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(92, 71, 48, 0.08);
+  box-shadow: 0 0.125rem 0.375rem rgba(92, 71, 48, 0.08);
 }
 
 .minimal-refresh-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* Loading States */
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem;
+  text-align: center;
+  font-family: 'Century Gothic' !important;
+}
+
+.dashboard-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f3f4f6;
+  border-top: 2px solid #5c4730;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.dashboard-loading .loading-text {
+  font-size: 0.8125rem;
+  color: #666;
+  font-weight: 600;
+  font-family: 'Century Gothic' !important;
+}
+
+/* Error States */
+.dashboard-error {
+  text-align: center;
+  padding: 2rem;
+  font-family: 'Century Gothic' !important;
+}
+
+.error-message {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #c0392b;
+  margin-bottom: 1rem;
+  font-family: 'Century Gothic' !important;
 }
 
 /* Responsive Design */
 @media (max-width: 1200px) {
   .minimal-stats-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.625rem;
+  }
+  
+  .dashboard-main {
+    gap: 0.875rem;
   }
 }
 
 @media (max-width: 992px) {
   .dashboard-main {
     flex-direction: column;
-    gap: 1.25rem;
+    gap: 1rem;
   }
   
   .recent-customers-section,
@@ -419,8 +620,13 @@
     flex: 0 0 100%;
   }
   
+  .recent-customers-card,
+  .quick-actions-card {
+    min-height: 340px;
+  }
+  
   .customers-list {
-    max-height: 21.875rem;
+    max-height: 15rem;
   }
 }
 
@@ -430,21 +636,25 @@
   }
   
   .dashboard-title {
-    font-size: 1.375rem;
+    font-size: 0.8125rem;
+  }
+  
+  .dashboard-subtitle {
+    font-size: 0.625rem;
   }
   
   .minimal-stats-grid {
     grid-template-columns: 1fr;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
   
   .minimal-stat-card {
-    padding: 1.125rem;
-    min-height: 6.875rem;
+    padding: 0.875rem;
+    min-height: 5.5rem;
   }
   
   .stat-value {
-    font-size: 1.375rem;
+    font-size: 1rem;
   }
   
   .header-content {
@@ -458,56 +668,182 @@
   }
   
   .section-title {
-    font-size: 1rem;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.3px;
+  }
+  
+  .section-title::after {
+    width: 2rem;
+    height: 0.15rem;
   }
   
   .recent-customers-card,
   .quick-actions-card {
-    padding: 1.25rem;
+    padding: 0.875rem;
+    min-height: 320px;
   }
   
   .customers-list {
-    max-height: 18.75rem;
+    max-height: 13rem;
+  }
+  
+  /* Even more compact on mobile */
+  .customer-row {
+    padding: 0.375rem 0.5rem;
+    min-height: 3rem;
+    max-height: 3.25rem;
+  }
+  
+  .customer-name {
+    font-size: 0.6875rem !important;
+  }
+  
+  .customer-phone {
+    font-size: 0.625rem !important;
+  }
+  
+  .transaction-date {
+    font-size: 0.5625rem !important;
+  }
+  
+  .arrears-amount {
+    font-size: 0.6875rem !important;
+  }
+  
+  .arrears-amount svg {
+    font-size: 10px !important;
+  }
+  
+  .arrears-label {
+    font-size: 0.5rem !important;
+  }
+  
+  /* Mobile adjustments for quick actions */
+  .quick-action-item {
+    padding: 0.375rem 0.5rem; /* Further reduced on mobile */
+    min-height: 3rem; /* Further reduced on mobile */
+    max-height: 3.25rem; /* Further reduced on mobile */
+    gap: 0.375rem; /* Reduced gap on mobile */
+  }
+  
+  .action-icon {
+    width: 1.75rem; /* Smaller on mobile */
+    height: 1.75rem; /* Smaller on mobile */
+    font-size: 0.875rem; /* Smaller on mobile */
+  }
+  
+  .action-label {
+    font-size: 0.6875rem !important; /* Smaller on mobile */
+  }
+  
+  .view-all-btn {
+    font-size: 0.5625rem;
+    padding: 0.1875rem 0.4375rem;
   }
 }
 
 @media (max-width: 480px) {
   .dashboard-title {
-    font-size: 1.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .dashboard-subtitle {
+    font-size: 0.5625rem;
   }
   
   .stat-value {
-    font-size: 1.25rem;
+    font-size: 0.9375rem;
   }
   
   .stat-icon-wrapper {
-    width: 2.25rem;
-    height: 2.25rem;
-    font-size: 1.125rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.875rem;
   }
   
   .customer-row {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 0.25rem;
+    padding: 0.375rem;
+    min-height: auto;
   }
   
   .arrears-info {
     text-align: left;
     width: 100%;
+    padding-left: 0;
+    align-items: flex-start;
+    gap: 0.125rem;
   }
   
   .quick-action-item {
-    padding: 1rem;
+    padding: 0.375rem;
+    min-height: 2.75rem; /* Even smaller on very small screens */
+    gap: 0.375rem;
   }
   
   .action-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1.25rem;
+    width: 1.5rem; /* Even smaller on very small screens */
+    height: 1.5rem; /* Even smaller on very small screens */
+    font-size: 0.75rem; /* Even smaller on very small screens */
+  }
+  
+  .action-label {
+    font-size: 0.625rem !important; /* Even smaller on very small screens */
   }
   
   .customers-list {
-    max-height: 15.625rem;
+    max-height: 11rem;
+  }
+  
+  .section-title {
+    font-size: 0.6875rem !important;
+    letter-spacing: 0.25px;
+  }
+  
+  .section-title::after {
+    width: 1.75rem;
+    height: 0.125rem;
+  }
+}
+
+/* Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Selection Styles */
+::selection {
+  background: rgba(212, 167, 98, 0.2);
+  color: #3c2a1c;
+}
+
+/* Century Gothic font fallback */
+@supports not (font-family: 'Century Gothic') {
+  .dashboard-wrapper,
+  .minimal-stat-card,
+  .recent-customers-card,
+  .quick-actions-card,
+  .customer-row,
+  .quick-action-item {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif !important;
   }
 }

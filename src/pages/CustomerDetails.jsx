@@ -1,17 +1,34 @@
-// src/pages/CustomerDetails.jsx - UPDATED WITH PAYMENT IMPROVEMENTS
+// src/pages/CustomerDetails.jsx - TABBED INTERFACE VERSION WITH TRANSACTION MODAL
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     Box,
     Typography,
     LinearProgress,
-    Alert
+    Alert,
+    Modal,
+    IconButton
 } from '@mui/material';
 import {
     ArrowBack,
     Download,
     SendToMobile,
-    Comment
+    Comment,
+    Person,
+    AccountBalance,
+    Receipt,
+    History,
+    AddToPhotos,
+    Close,
+    CheckCircle,
+    Cancel,
+    AccessTime,
+    HourglassEmpty,
+    Person as PersonIcon,
+    Payment,
+    ReceiptLong,
+    AccountBalance as AccountBalanceIcon,
+    DoneAll
 } from '@mui/icons-material';
 import axios from 'axios';
 import '../styles/CustomerDetails.css';
@@ -21,6 +38,7 @@ const CustomerDetails = () => {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [serverOnline, setServerOnline] = useState(true);
     const [error, setError] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [transactionsLoading, setTransactionsLoading] = useState(false);
@@ -45,6 +63,8 @@ const CustomerDetails = () => {
     const [mpesaStatus, setMpesaStatus] = useState(null);
     const [processingPayment, setProcessingPayment] = useState(false);
     const [paymentInitiated, setPaymentInitiated] = useState(false);
+    const [showPinEntry, setShowPinEntry] = useState(false);
+    const [manualPin, setManualPin] = useState('');
 
     // Active transaction tracking
     const [hasActiveTransaction, setHasActiveTransaction] = useState(false);
@@ -53,6 +73,25 @@ const CustomerDetails = () => {
     // Transaction filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+
+    // Promise to pay states
+    const [promises, setPromises] = useState([]);
+    const [promisesLoading, setPromisesLoading] = useState(false);
+    const [showPromiseModal, setShowPromiseModal] = useState(false);
+    const [promiseData, setPromiseData] = useState({
+        promiseAmount: '',
+        promiseDate: '',
+        promiseType: 'FULL_PAYMENT',
+        notes: ''
+    });
+
+    // Tab state
+    const [activeTab, setActiveTab] = useState('customers');
+
+    // Transaction modal states
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+    const [transactionCustomerDetails, setTransactionCustomerDetails] = useState(null);
 
     // Ref for auto-close timer
     const autoCloseTimerRef = useRef(null);
@@ -86,6 +125,7 @@ const CustomerDetails = () => {
         };
     }, [showFullBalancePopup]);
 
+    // Main data fetching effect
     useEffect(() => {
         console.log('=== CUSTOMER DETAILS MOUNTED ===');
         console.log('ID from URL:', id);
@@ -100,6 +140,7 @@ const CustomerDetails = () => {
         fetchCustomerDetails();
         fetchCustomerTransactions();
         fetchCustomerComments();
+        fetchCustomerPromises();
     }, [id]);
 
     useEffect(() => {
@@ -150,71 +191,65 @@ const CustomerDetails = () => {
             setError(null);
 
             const token = localStorage.getItem('token');
-            console.log('Token exists:', !!token);
 
             if (!token) {
-                console.error('❌ No authentication token found');
                 navigate('/login');
                 return;
             }
 
-            console.log(`🔍 Making API call to: /customers/${id}`);
+            // Add a timeout for the request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            const response = await axios.get(`http://localhost:5000/api/customers/${id}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            console.log('✅ API Response received:', response.status);
-
-            if (response.data.success) {
-                const customerData = response.data.data.customer;
-                console.log('🎉 Customer data loaded');
-
-                setCustomer(customerData);
-                setPaymentData({
-                    phoneNumber: customerData.phoneNumber || '',
-                    alternativePhoneNumber: '',
-                    amount: customerData.arrears || '',
-                    useAlternativeNumber: false
+            try {
+                const response = await axios.get(`http://localhost:5000/api/customers/${id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    signal: controller.signal
                 });
-            } else {
-                console.error('API returned success: false');
-                setError(response.data.message || 'Failed to load customer details');
+
+                clearTimeout(timeoutId);
+                setServerOnline(true); // Server is online
+
+                if (response.data.success) {
+                    const customerData = response.data.data.customer;
+                    setCustomer(customerData);
+                    setPaymentData({
+                        phoneNumber: customerData.phoneNumber || '',
+                        alternativePhoneNumber: '',
+                        amount: customerData.arrears || '',
+                        useAlternativeNumber: false
+                    });
+                } else {
+                    setError(response.data.message || 'Failed to load customer details');
+                }
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    console.error('Request timeout - server might be offline');
+                    setServerOnline(false);
+                    setError('Server is taking too long to respond. Please check if the backend is running.');
+                } else {
+                    throw fetchError;
+                }
             }
         } catch (error) {
             console.error('❌ Error in fetchCustomerDetails:', error);
 
-            if (error.response) {
-                console.error('Response status:', error.response.status);
-
-                if (error.response.status === 401) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    navigate('/login');
-                    return;
-                }
-
-                if (error.response.status === 404) {
-                    setError('Customer not found. The customer may have been deleted.');
-                } else if (error.response.status === 400) {
-                    setError('Invalid customer ID format');
-                } else if (error.response.status === 500) {
-                    setError('Server error: ' + (error.response.data?.message || 'Internal server error'));
-                } else {
-                    setError(error.response.data?.message || `Error ${error.response.status}: Failed to load customer details`);
-                }
+            if (error.code === 'ERR_NETWORK') {
+                setServerOnline(false);
+                setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
+            } else if (error.response) {
+                // Handle other response errors...
             } else if (error.request) {
-                console.error('No response received from server');
-                setError('No response from server. Please check your connection.');
+                setServerOnline(false);
+                setError('No response from server. The backend might be offline.');
             } else {
-                console.error('Request setup error:', error.message);
-                setError('Error setting up request: ' + error.message);
+                setError('Error: ' + error.message);
             }
         } finally {
-            console.log('🔚 fetchCustomerDetails completed');
             setLoading(false);
         }
     };
@@ -302,6 +337,30 @@ const CustomerDetails = () => {
             console.error('Error in fetchCustomerComments:', error);
         } finally {
             setCommentsLoading(false);
+        }
+    };
+
+    const fetchCustomerPromises = async () => {
+        if (!id || id === 'undefined') return;
+
+        try {
+            setPromisesLoading(true);
+            const token = localStorage.getItem('token');
+
+            const response = await axios.get(
+                `http://localhost:5000/api/promises/customer/${id}?limit=5`,
+                {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }
+            );
+
+            if (response.data.success) {
+                setPromises(response.data.data.promises || []);
+            }
+        } catch (error) {
+            console.error('Error fetching promises:', error.message);
+        } finally {
+            setPromisesLoading(false);
         }
     };
 
@@ -484,12 +543,11 @@ const CustomerDetails = () => {
                 return 'Invalid date';
             }
 
+            // For promises, use a simpler format
             return date.toLocaleDateString('en-KE', {
                 month: 'short',
                 day: 'numeric',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                year: 'numeric'
             });
         } catch (error) {
             console.error('Error formatting date:', error);
@@ -497,29 +555,20 @@ const CustomerDetails = () => {
         }
     };
 
-    const formatTransactionDate = (dateString) => {
-        if (!dateString) return { date: 'N/A', time: '' };
+    const formatDateTime = (dateString) => {
+        if (!dateString) return { date: 'N/A', time: '', full: 'N/A' };
 
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) {
-                return { date: 'Invalid date', time: '' };
+                return { date: 'Invalid date', time: '', full: 'Invalid date' };
             }
 
-            const now = new Date();
-            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-
-            let dateDisplay;
-            if (diffDays === 0) dateDisplay = 'Today';
-            else if (diffDays === 1) dateDisplay = 'Yesterday';
-            else if (diffDays < 7) dateDisplay = `${diffDays} days ago`;
-            else {
-                dateDisplay = date.toLocaleDateString('en-KE', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-            }
+            const dateDisplay = date.toLocaleDateString('en-KE', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
 
             const timeDisplay = date.toLocaleTimeString('en-KE', {
                 hour: '2-digit',
@@ -527,9 +576,13 @@ const CustomerDetails = () => {
                 hour12: true
             });
 
-            return { date: dateDisplay, time: timeDisplay };
+            return {
+                date: dateDisplay,
+                time: timeDisplay,
+                full: `${dateDisplay} ${timeDisplay}`
+            };
         } catch (error) {
-            return { date: 'N/A', time: '' };
+            return { date: 'N/A', time: '', full: 'N/A' };
         }
     };
 
@@ -592,16 +645,58 @@ const CustomerDetails = () => {
         return reasons[failureReason] || 'Unknown';
     };
 
-    // Add this function for status display
     const getStatusDisplayText = (status, failureReason) => {
         const statusMap = {
             'success': 'Success',
-            'failed': failureReason ? `Failed (${getFailureReasonText(failureReason)})` : 'Failed',
+            'failed': 'Failed',
             'pending': 'Pending',
             'expired': 'Expired',
             'cancelled': 'Cancelled'
         };
         return statusMap[status?.toLowerCase()] || status || 'PENDING';
+    };
+
+    // Transaction status props function
+    const getStatusProps = (status) => {
+        const statusUpper = status?.toUpperCase();
+        switch (statusUpper) {
+            case 'SUCCESS':
+                return {
+                    text: 'Success',
+                    class: 'success',
+                    icon: <CheckCircle sx={{ fontSize: 14 }} />
+                };
+            case 'FAILED':
+                return {
+                    text: 'Failed',
+                    class: 'failed',
+                    icon: <Cancel sx={{ fontSize: 14 }} />
+                };
+            case 'PENDING':
+                return {
+                    text: 'Pending',
+                    class: 'pending',
+                    icon: <AccessTime sx={{ fontSize: 14 }} />
+                };
+            case 'EXPIRED':
+                return {
+                    text: 'Expired',
+                    class: 'expired',
+                    icon: <HourglassEmpty sx={{ fontSize: 14 }} />
+                };
+            case 'CANCELLED':
+                return {
+                    text: 'Cancelled',
+                    class: 'cancelled',
+                    icon: <Cancel sx={{ fontSize: 14, color: '#6b7280' }} />
+                };
+            default:
+                return {
+                    text: status || 'Unknown',
+                    class: 'pending',
+                    icon: <AccessTime sx={{ fontSize: 14 }} />
+                };
+        }
     };
 
     // Filter transactions
@@ -617,6 +712,96 @@ const CustomerDetails = () => {
         return matchesSearch && matchesStatus;
     });
 
+    const getPromiseStatusClass = (status) => {
+        const statusMap = {
+            'PENDING': 'pending',
+            'FULFILLED': 'fulfilled',
+            'BROKEN': 'broken',
+            'RESCHEDULED': 'rescheduled',
+            'CANCELLED': 'cancelled'
+        };
+        return statusMap[status] || 'pending';
+    };
+
+    const createPromise = async () => {
+        console.log('🔄 createPromise called with:', promiseData);
+        console.log('📱 Customer ID:', id);
+
+        if (!promiseData.promiseAmount || !promiseData.promiseDate) {
+            setError('Please enter amount and date');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+            console.log('📤 Sending request to /api/promises with:', {
+                customerId: id,
+                promiseAmount: parseFloat(promiseData.promiseAmount),
+                promiseDate: promiseData.promiseDate,
+                promiseType: promiseData.promiseType,
+                notes: promiseData.notes
+            });
+
+            const response = await axios.post(
+                'http://localhost:5000/api/promises',
+                {
+                    customerId: id,
+                    promiseAmount: parseFloat(promiseData.promiseAmount),
+                    promiseDate: promiseData.promiseDate,
+                    promiseType: promiseData.promiseType,
+                    notes: promiseData.notes
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            if (response.data.success) {
+                setPromiseData({
+                    promiseAmount: '',
+                    promiseDate: '',
+                    promiseType: 'FULL_PAYMENT',
+                    notes: ''
+                });
+                setShowPromiseModal(false);
+                fetchCustomerPromises();
+                alert('Promise created successfully!');
+            }
+        } catch (error) {
+            console.error('Error creating promise:', error);
+            setError(error.response?.data?.message || 'Failed to create promise');
+        }
+    };
+
+    const updatePromiseStatus = async (promiseId, status) => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const response = await axios.patch(
+                `http://localhost:5000/api/promises/${promiseId}/status`,
+                { status },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                fetchCustomerPromises();
+                alert(`Promise marked as ${status.toLowerCase()}`);
+            }
+        } catch (error) {
+            console.error('Error updating promise:', error);
+            setError(error.response?.data?.message || 'Failed to update promise');
+        }
+    };
+
     const handleProcessPayment = () => {
         console.log('Opening payment modal');
         setShowPaymentModal(true);
@@ -630,41 +815,61 @@ const CustomerDetails = () => {
         }));
     };
 
-    // Add WhatsApp conversation button
     const openWhatsAppConversation = () => {
         if (mpesaStatus?.phoneUsed) {
             window.open(`https://wa.me/${mpesaStatus.phoneUsed}`, '_blank');
         }
     };
 
-    // Add manual PIN entry function (for demo purposes)
-    const handleManualPinEntry = async () => {
+    const handleManualPinSubmit = async () => {
+        if (!manualPin || manualPin.length !== 4 || !/^\d+$/.test(manualPin)) {
+            setError('Please enter a valid 4-digit PIN');
+            return;
+        }
+
+        if (!mpesaStatus?.transactionId) {
+            setError('No transaction ID found');
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
-            const pin = prompt('Enter a 4-digit MPESA PIN (for demo purposes):');
-            
-            if (pin && pin.length === 4 && /^\d+$/.test(pin)) {
-                // Simulate PIN confirmation
-                alert('PIN confirmed! Payment will be processed.');
-                
-                // You would typically call an API endpoint here to process the payment
-                // For now, just update the status
-                setMpesaStatus(prev => ({
-                    ...prev,
+            const response = await axios.post(
+                'http://localhost:5000/api/payments/manual-pin',
+                {
+                    transactionId: mpesaStatus.transactionId,
+                    pin: manualPin
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                setMpesaStatus({
                     status: 'completed',
-                    message: '✅ Payment Completed!',
-                    details: 'Payment processed successfully with manual PIN entry.',
+                    message: 'Payment Completed!',
+                    details: '',
                     completedAt: new Date().toISOString()
-                }));
-                
-                // Refresh customer data
+                });
+
+                setShowPinEntry(false);
+                setManualPin('');
+
+                // Refresh data
                 fetchCustomerDetails();
                 fetchCustomerTransactions();
-            } else if (pin) {
-                alert('Please enter a valid 4-digit PIN');
+
+                alert('Payment completed successfully!');
+            } else {
+                setError(response.data.message || 'Payment failed');
             }
         } catch (error) {
-            console.error('Error in manual PIN entry:', error);
+            console.error('Manual PIN error:', error);
+            setError(error.response?.data?.message || 'Failed to process payment');
         }
     };
 
@@ -778,7 +983,6 @@ const CustomerDetails = () => {
         setShowConfirmationModal(true);
     };
 
-    // Fixed handleConfirmPayment function
     const handleConfirmPayment = async () => {
         try {
             setProcessingPayment(true);
@@ -793,7 +997,7 @@ const CustomerDetails = () => {
                 ? paymentData.alternativePhoneNumber
                 : paymentData.phoneNumber;
 
-            console.log('Sending WhatsApp payment request:', {
+            console.log('Sending payment request:', {
                 phoneNumber: phoneToUse,
                 amount: paymentData.amount,
                 customer: customer?.name
@@ -818,39 +1022,33 @@ const CustomerDetails = () => {
                 }
             );
 
-            console.log('WhatsApp response:', response.data);
+            console.log('Payment request response:', response.data);
 
             if (response.data.success) {
-                const transactionId = response.data.data.transaction.transactionId;
-                const whatsappMessageId = response.data.data.whatsapp.messageId;
-
+                // Show success message briefly, then close modal
                 setMpesaStatus({
                     status: 'success',
-                    message: 'Prompt request sent successfully!',
-                    messageId: whatsappMessageId,
-                    transactionId: transactionId,
+                    message: '',
+                    transactionId: response.data.data.transaction?.transactionId,
                     phoneUsed: phoneToUse,
-                    details: 'The customer has received a message with payment instructions.',
                     sentAt: new Date().toISOString()
                 });
-
-                // Start polling for status updates
-                startStatusPolling(transactionId);
 
                 // Refresh transactions
                 fetchCustomerTransactions();
 
-                // Open WhatsApp conversation (optional)
-                if (window.confirm('Open WhatsApp to view the sent message?')) {
-                    window.open(`https://wa.me/${phoneToUse}`, '_blank');
-                }
+                // Close modal after 2 seconds
+                setTimeout(() => {
+                    closePaymentModal();
+                    // Show success toast
+                    alert('Payment request sent successfully.');
+                }, 3000);
 
             } else {
                 setMpesaStatus({
                     status: 'failed',
-                    message: response.data.message || 'Failed to send WhatsApp message',
-                    details: 'Please check the phone number and try again.',
-                    error: response.data.error
+                    message: response.data.message || 'Failed to send payment request',
+                    details: 'Please check the phone number and try again.'
                 });
                 setPaymentInitiated(false);
                 setProcessingPayment(false);
@@ -868,47 +1066,52 @@ const CustomerDetails = () => {
         }
     };
 
-    // Add status polling function
     const startStatusPolling = (transactionId) => {
         const pollInterval = setInterval(async () => {
             try {
                 const token = localStorage.getItem('token');
+
+                // CORRECT ENDPOINT:
                 const response = await axios.get(
-                    `http://localhost:5000/api/payments/whatsapp-status/${transactionId}`,
+                    `http://localhost:5000/api/payments/status/${transactionId}`,
                     {
                         headers: { 'Authorization': `Bearer ${token}` }
                     }
                 );
 
+                console.log('Polling status response:', response.data);
+
                 if (response.data.success) {
-                    const status = response.data.data.status;
+                    const transaction = response.data.data.transaction;
+                    const status = transaction.status?.toUpperCase();
+
                     console.log('Polling status:', status);
 
                     // Check if transaction is completed
-                    if (status.status !== 'PENDING') {
+                    if (status !== 'PENDING') {
                         clearInterval(pollInterval);
 
-                        if (status.status === 'SUCCESS') {
+                        if (status === 'SUCCESS') {
                             setMpesaStatus(prev => ({
                                 ...prev,
                                 status: 'completed',
-                                message: '✅ Payment completed via WhatsApp!',
-                                details: 'The customer has confirmed the payment on WhatsApp.',
+                                message: 'Payment completed via Prompt',
+                                details: 'The customer has confirmed the payment.',
                                 completedAt: new Date().toISOString()
                             }));
 
                             // Show success notification
-                            alert('Payment completed successfully via WhatsApp!');
+                            alert('Payment completed successfully.');
 
-                        } else if (status.status === 'FAILED') {
+                        } else if (status === 'FAILED') {
                             setMpesaStatus(prev => ({
                                 ...prev,
                                 status: 'failed',
                                 message: '❌ Payment failed',
-                                details: status.errorMessage || 'Payment was not completed.',
+                                details: transaction.errorMessage || 'Payment was not completed.',
                                 failedAt: new Date().toISOString()
                             }));
-                        } else if (status.isExpired) {
+                        } else if (status === 'EXPIRED') {
                             setMpesaStatus(prev => ({
                                 ...prev,
                                 status: 'expired',
@@ -917,7 +1120,8 @@ const CustomerDetails = () => {
                             }));
                         }
 
-                        // Refresh transactions
+                        // Refresh customer data
+                        fetchCustomerDetails();
                         fetchCustomerTransactions();
                     }
                 }
@@ -935,7 +1139,7 @@ const CustomerDetails = () => {
                 message: '⏰ Polling stopped',
                 details: 'Status polling stopped after 30 minutes.'
             }));
-        }, 30 * 60 * 1000);
+        }, 30 * 60 * 1000); // 30 minutes
     };
 
     const closePaymentModal = () => {
@@ -949,6 +1153,90 @@ const CustomerDetails = () => {
         if (autoCloseTimerRef.current) {
             clearTimeout(autoCloseTimerRef.current);
             autoCloseTimerRef.current = null;
+        }
+    };
+
+    // Transaction modal functions
+    const handleTransactionClick = async (transaction) => {
+        setSelectedTransaction(transaction);
+        
+        // Fetch customer details for the transaction
+        if (transaction.customerId?._id || transaction.customerId) {
+            try {
+                const token = localStorage.getItem('token');
+                const customerId = transaction.customerId._id || transaction.customerId;
+                const response = await axios.get(`http://localhost:5000/api/customers/${customerId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.data.success) {
+                    setTransactionCustomerDetails(response.data.data.customer);
+                } else {
+                    setTransactionCustomerDetails(null);
+                }
+            } catch (error) {
+                console.error('Error fetching customer details:', error);
+                setTransactionCustomerDetails(null);
+            }
+        } else {
+            setTransactionCustomerDetails(null);
+        }
+        
+        setTransactionModalOpen(true);
+    };
+
+    const handleCloseTransactionModal = () => {
+        setTransactionModalOpen(false);
+        setSelectedTransaction(null);
+        setTransactionCustomerDetails(null);
+    };
+
+    // Calculate loan details for transaction modal
+    const calculateLoanDetails = (transaction) => {
+        const currentCustomerData = transactionCustomerDetails || transaction.customerId;
+
+        const transactionAmount = parseFloat(transaction.amount || 0);
+        const totalLoanBalance = parseFloat(currentCustomerData?.loanBalance || 0);
+        const arrearsAmount = parseFloat(currentCustomerData?.arrears || currentCustomerData?.arrearsBalance || 0);
+        const totalRepayments = parseFloat(currentCustomerData?.totalRepayments || 0);
+
+        if (transaction.status?.toUpperCase() === 'SUCCESS') {
+            const arrearsCleared = Math.min(transactionAmount, arrearsAmount);
+            const principalPaid = Math.max(0, transactionAmount - arrearsCleared);
+            const remainingArrears = Math.max(0, arrearsAmount - arrearsCleared);
+            const remainingPrincipal = Math.max(0, totalLoanBalance - arrearsAmount - principalPaid);
+            const newLoanBalance = remainingArrears + remainingPrincipal;
+            const totalCleared = arrearsCleared + principalPaid;
+
+            return {
+                transactionAmount,
+                totalLoanBalance,
+                arrearsAmount,
+                arrearsCleared,
+                principalPaid,
+                remainingArrears,
+                remainingPrincipal,
+                newLoanBalance,
+                totalCleared,
+                totalRepayments,
+                isPaidOff: newLoanBalance <= 0,
+                hasArrears: remainingArrears > 0
+            };
+        } else {
+            return {
+                transactionAmount,
+                totalLoanBalance,
+                arrearsAmount,
+                arrearsCleared: 0,
+                principalPaid: 0,
+                remainingArrears: arrearsAmount,
+                remainingPrincipal: Math.max(0, totalLoanBalance - arrearsAmount),
+                newLoanBalance: totalLoanBalance,
+                totalCleared: 0,
+                totalRepayments,
+                isPaidOff: false,
+                hasArrears: arrearsAmount > 0
+            };
         }
     };
 
@@ -1018,395 +1306,607 @@ const CustomerDetails = () => {
     return (
         <Box className="customer-details-wrapper">
             {/* Header */}
-            <Box className="customer-details-header">
-                <div className="customer-details-header-content">
-                    <div className="customer-details-title-section">
-                        <button
-                            onClick={() => navigate('/customers')}
-                            className="back-button"
-                        >
-                            <ArrowBack sx={{ fontSize: 16 }} />
-                            Back
-                        </button>
-                        <Box>
-                            <Typography className="customer-details-title">
-                                {customer?.customerId || customer?._id || id}
-                            </Typography>
-                        </Box>
-                    </div>
+            {!serverOnline && (
+                <Alert severity="error" sx={{
+                    mb: 2,
+                    borderRadius: '8px',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    fontSize: '0.875rem'
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" fontWeight="bold">
+                            ⚠️ Server Offline
+                        </Typography>
+                        <Typography variant="body2">
+                            Backend server is not running. Please start the server:
+                        </Typography>
+                    </Box>
+                    <Box sx={{ mt: 1, pl: 2 }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: '#f5f5f5', p: 1, borderRadius: 1 }}>
+                            1. Open terminal in /backend directory<br />
+                            2. Run: npm run dev
+                        </Typography>
+                    </Box>
+                </Alert>
+            )}
 
-                    <div className="customer-details-actions">
-                        <button
-                            className="customer-details-action-btn"
-                            onClick={handleExportStatement}
-                        >
-                            <Download sx={{ fontSize: 16 }} />
-                            Statement
-                        </button>
-                        <button
-                            className="customer-details-primary-btn"
-                            onClick={handleProcessPayment}
-                            disabled={parseFloat(customer?.loanBalance || 0) <= 0 || hasActiveTransaction}
-                            style={{
-                                opacity: hasActiveTransaction ? 0.6 : 1,
-                                cursor: hasActiveTransaction ? 'not-allowed' : 'pointer'
-                            }}
-                        >
-                            <SendToMobile sx={{ fontSize: 16 }} />
-                            {hasActiveTransaction ? `Active (${activeTransactionStatus})` : 'Prompt'}
-                        </button>
+            {/* Fixed Header - Won't Scroll */}
+            <Box className="customer-details-fixed-header">
+                <Box className="customer-details-header">
+                    <div className="customer-details-header-content">
+                        <div className="customer-details-title-section">
+                            <button
+                                onClick={() => navigate('/customers')}
+                                className="back-button"
+                            >
+                                <ArrowBack sx={{ fontSize: 16 }} />
+                                Back
+                            </button>
+                            <Box>
+                                <Typography className="customer-details-subtitle">
+                                    ID: {customer?.customerId || customer?._id || id}
+                                </Typography>
+                            </Box>
+                        </div>
+
+                        <div className="customer-details-actions">
+                            <button
+                                className="customer-details-action-btn"
+                                onClick={handleExportStatement}
+                            >
+                                <Download sx={{ fontSize: 16 }} />
+                                Statement
+                            </button>
+
+                            <button
+                                className="customer-details-action-btn"
+                                onClick={() => setShowPromiseModal(true)}
+                                style={{
+                                    backgroundColor: '#f5f0ea',
+                                    color: '#5c4730'
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '4px' }}>
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                </svg>
+                                Promise
+                            </button>
+
+                            <button
+                                className="customer-details-primary-btn"
+                                onClick={handleProcessPayment}
+                                disabled={parseFloat(customer?.loanBalance || 0) <= 0 || hasActiveTransaction}
+                                style={{
+                                    opacity: hasActiveTransaction ? 0.6 : 1,
+                                    cursor: hasActiveTransaction ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                <SendToMobile sx={{ fontSize: 16 }} />
+                                {hasActiveTransaction ? `Active (${activeTransactionStatus})` : 'Prompt'}
+                            </button>
+                        </div>
                     </div>
+                </Box>
+
+                {/* Horizontal Tab Navigation */}
+                <div className="customer-details-tabs">
+                    <button
+                        className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('customers')}
+                    >
+                        <Person sx={{ fontSize: 25, marginRight: '0.5rem' }} />
+                        Customer
+                        {activeTab === 'customers' && <div className="tab-indicator"></div>}
+                    </button>
+
+                    <button
+                        className={`tab-btn ${activeTab === 'arrears' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('arrears')}
+                    >
+                        <AddToPhotos sx={{ fontSize: 25, marginRight: '0.5rem' }} />
+                        Arrears
+                        {activeTab === 'arrears' && <div className="tab-indicator"></div>}
+                    </button>
+
+                    <button
+                        className={`tab-btn ${activeTab === 'promises' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('promises')}
+                    >
+                        <History sx={{ fontSize: 25, marginRight: '0.5rem' }} />
+                        PTP
+                        {activeTab === 'promises' && <div className="tab-indicator"></div>}
+                    </button>
                 </div>
             </Box>
 
-            {/* Main Content */}
-            <div className="customer-details-container">
-                {/* Top Row: Customer Info & Loan Details Side by Side */}
-                <div className="top-row-cards">
-                    {/* Customer Information Card */}
-                    <div className="details-card customer-details-card">
-                        <div className="card-header">
-                            <Typography className="card-title">
-                                Customer Information
-                            </Typography>
-                        </div>
+            {/* Scrollable Content Area */}
+            <div className="customer-details-content">
+                {/* Tab Content */}
+                {activeTab === 'customers' && (
+                    <div className="tab-content active">
+                        {/* Customer Information Card */}
+                        <div className="details-card customer-info-card">
+                            <div className="card-header">
+                                <Person sx={{ fontSize: 14, marginRight: '0.5rem', color: '#5c4730' }} />
+                                <Typography className="card-title">
+                                    Customer Information
+                                </Typography>
+                            </div>
 
-                        <div className="card-body">
-                            <div className="info-grid">
-                                <div className="info-item">
-                                    <div className="info-label">Customer ID</div>
-                                    <div className="info-value">{customer?.customerId || 'N/A'}</div>
-                                </div>
+                            <div className="card-body">
+                                <div className="customer-info-grid">
+                                    {/* Full width items */}
+                                    <div className="customer-info-item name-item full-width">
+                                        <div className="info-label">Full Name</div>
+                                        <div className="info-value">{customer?.name || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Full Name</div>
-                                    <div className="info-value">{customer?.name || 'N/A'}</div>
-                                </div>
+                                    <div className="customer-info-item half-width">
+                                        <div className="info-label">Phone Number</div>
+                                        <div className="info-value">{customer?.phoneNumber || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Phone Number</div>
-                                    <div className="info-value">{customer?.phoneNumber || 'N/A'}</div>
-                                </div>
+                                    <div className="customer-info-item half-width">
+                                        <div className="info-label">Customer ID</div>
+                                        <div className="info-value">{customer?.customerId || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Email Address</div>
-                                    <div className="info-value">{customer?.email || 'N/A'}</div>
-                                </div>
+                                    <div className="customer-info-item email-item full-width">
+                                        <div className="info-label">Email Address</div>
+                                        <div className="info-value">{customer?.email || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">National ID</div>
-                                    <div className="info-value">{customer?.nationalId || 'N/A'}</div>
-                                </div>
+                                    <div className="customer-info-item half-width">
+                                        <div className="info-label">National ID</div>
+                                        <div className="info-value">{customer?.nationalId || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Account Number</div>
-                                    <div className="info-value">{customer?.accountNumber || 'N/A'}</div>
-                                </div>
+                                    <div className="customer-info-item half-width">
+                                        <div className="info-label">Account Number</div>
+                                        <div className="info-value">{customer?.accountNumber || 'N/A'}</div>
+                                    </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Date Added</div>
-                                    <div className="info-value">
-                                        {customer?.createdAt ? formatDate(customer.createdAt) : 'N/A'}
+                                    <div className="customer-info-item half-width">
+                                        <div className="info-label">Date Added</div>
+                                        <div className="info-value">
+                                            {customer?.createdAt ? formatDate(customer.createdAt) : 'N/A'}
+                                        </div>
+                                    </div>
+
+                                    <div className="customer-info-item status-item half-width">
+                                        <div className="info-label">Account Status</div>
+                                        <div className="info-value">
+                                            <span className={customer?.isActive ? 'active-status' : 'inactive-status'}>
+                                                {customer?.isActive ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                )}
 
-                    {/* Loan Details Card */}
-                    <div className="details-card loan-details-card">
-                        <div className="card-header">
-                            <Typography className="card-title">
-                                Loan Details
-                            </Typography>
-                            <span className={`status-badge ${getStatusColor(customer?.arrears)}`}>
-                                {getStatusText(customer?.arrears)}
-                            </span>
+                {activeTab === 'arrears' && (
+                    <div className="tab-content active" data-tab="arrears">
+                        {/* Loan Details Card - Full Width */}
+                        <div className="details-card loan-details-card" style={{ width: '100%', gridColumn: '1 / -1' }}>
+                            <div className="card-header">
+                                <AccountBalance sx={{ fontSize: 14, marginRight: '0.5rem', color: '#5c4730' }} />
+                                <Typography className="card-title">
+                                    Loan Details
+                                </Typography>
+                                <span className={`status-badge ${getStatusColor(customer?.arrears)}`}>
+                                    {getStatusText(customer?.arrears)}
+                                </span>
+                            </div>
+
+                            <div className="card-body">
+                                <div className="loan-info-grid">
+                                    <div className="info-item">
+                                        <div className="info-label">Loan Balance</div>
+                                        <div className="info-value amount">
+                                            {formatCurrency(customer?.loanBalance)}
+                                        </div>
+                                    </div>
+
+                                    <div className="info-item">
+                                        <div className="info-label">Arrears Amount</div>
+                                        <div className={`info-value amount ${getStatusColor(customer?.arrears)}`}>
+                                            {formatCurrency(customer?.arrears)}
+                                        </div>
+                                    </div>
+
+                                    <div className="info-item">
+                                        <div className="info-label">Total Repayments</div>
+                                        <div className="info-value amount success">
+                                            {formatCurrency(customer?.totalRepayments || 0)}
+                                        </div>
+                                    </div>
+
+                                    <div className="info-item">
+                                        <div className="info-label">Last Payment Date</div>
+                                        <div className="info-value">
+                                            {customer?.lastPaymentDate ? formatDate(customer.lastPaymentDate) : 'Never'}
+                                        </div>
+                                    </div>
+
+                                    {/* <div className="info-item">
+                                        <div className="info-label">Days in Arrears</div>
+                                        <div className="info-value">
+                                            {customer?.daysInArrears || '0'} days
+                                        </div>
+                                    </div> */}
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="card-body">
-                            <div className="info-grid">
-                                <div className="info-item">
-                                    <div className="info-label">Loan Balance</div>
-                                    <div className="info-value amount">
-                                        {formatCurrency(customer?.loanBalance)}
-                                    </div>
+                        {/* Customer Follow-up Comments Card - 35% */}
+                        <div className="details-card comment-card">
+                            <div className="card-header">
+                                <Comment sx={{ fontSize: 14, marginRight: '0.5rem', color: '#5c4730' }} />
+                                <Typography className="card-title">
+                                    Customer Follow-up
+                                </Typography>
+                                <button
+                                    className="comment-save-btn"
+                                    onClick={saveComment}
+                                    disabled={savingComment || !newComment.trim()}
+                                >
+                                    {savingComment ? 'Saving...' : commentSaved ? '✓ Saved' : 'Save'}
+                                </button>
+                            </div>
+
+                            <div className="card-body">
+                                {/* Comment Input */}
+                                <div className="comment-input-section">
+                                    <textarea
+                                        className="comment-textarea"
+                                        placeholder="Add notes about follow-up, payment promises, or reasons for non-payment..."
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        rows="3"
+                                    />
                                 </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Arrears Amount</div>
-                                    <div className={`info-value amount ${getStatusColor(customer?.arrears)}`}>
-                                        {formatCurrency(customer?.arrears)}
+                                {/* Comment History - Scrollable */}
+                                <div className="comment-history-section">
+                                    <div className="comment-history-header">
+                                        <Typography className="comment-history-title">
+                                            Comment History
+                                        </Typography>
+                                        {commentsLoading && <span className="loading-indicator">Loading...</span>}
                                     </div>
-                                </div>
 
-                                <div className="info-item">
-                                    <div className="info-label">Total Repayments</div>
-                                    <div className="info-value amount success">
-                                        {formatCurrency(customer?.totalRepayments || 0)}
-                                    </div>
-                                </div>
-
-                                <div className="info-item">
-                                    <div className="info-label">Last Payment Date</div>
-                                    <div className="info-value">
-                                        {customer?.lastPaymentDate ? formatDate(customer.lastPaymentDate) : 'No payments'}
-                                    </div>
-                                </div>
-
-                                <div className="info-item">
-                                    <div className="info-label">Status</div>
-                                    <div className={`info-value status ${getStatusColor(customer?.arrears)}`}>
-                                        {getStatusText(customer?.arrears)}
-                                    </div>
-                                </div>
-
-                                <div className="info-item">
-                                    <div className="info-label">Account Status</div>
-                                    <div className="info-value">
-                                        <span className={customer?.isActive ? 'active-status' : 'inactive-status'}>
-                                            {customer?.isActive ? 'Active' : 'Inactive'}
-                                        </span>
+                                    <div className="comment-history-container">
+                                        {commentsLoading ? (
+                                            <div className="loading-comments">
+                                                <Typography sx={{ color: '#666', textAlign: 'center', py: 2, fontSize: '0.875rem' }}>
+                                                    Loading comments...
+                                                </Typography>
+                                            </div>
+                                        ) : commentHistory.length === 0 ? (
+                                            <div className="no-comments">
+                                                <div className="no-comments-icon">📝</div>
+                                                <Typography className="no-comments-text">
+                                                    No comments yet. Add a comment above.
+                                                </Typography>
+                                            </div>
+                                        ) : (
+                                            commentHistory.map((commentItem) => {
+                                                const { date, time } = formatDateTime(commentItem.createdAt);
+                                                return (
+                                                    <div key={commentItem._id} className="comment-history-item">
+                                                        {commentItem.savedLocally && (
+                                                            <div className="local-comment-badge" title="Saved locally (not synced to server)">
+                                                                📱 Local
+                                                            </div>
+                                                        )}
+                                                        <div className="comment-history-content">
+                                                            {commentItem.comment}
+                                                        </div>
+                                                        <div className="comment-history-meta">
+                                                            <span className="comment-history-author">
+                                                                {commentItem.author || 'Agent'}
+                                                            </span>
+                                                            <span className="comment-history-date">
+                                                                {date} {time}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Bottom Row: Comment Section & Recent Transactions */}
-                <div className="bottom-row-cards">
-                    {/* Customer Follow-up Comments Card */}
-                    <div className="details-card comment-card">
-                        <div className="card-header">
-                            <Typography className="card-title">
-                                <Comment sx={{ fontSize: 16, marginRight: '0.5rem' }} />
-                                Customer Follow-up
-                            </Typography>
-                        </div>
+                        {/* Recent Transactions Card - 65% */}
+                        <div className="details-card transactions-card">
+                            <div className="card-header">
+                                <Receipt sx={{ fontSize: 14, marginRight: '0.5rem', color: '#5c4730' }} />
+                                <Typography className="card-title">
+                                    Recent Transactions
+                                </Typography>
+                                <button
+                                    className="refresh-btn"
+                                    onClick={handleRefreshTransactions}
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
 
-                        <div className="card-body">
-                            {/* Comment Input Section */}
-                            <div className="comment-input-section">
-                                <textarea
-                                    className="comment-textarea"
-                                    placeholder="Add notes about customer follow-up, payment promises, or reasons for non-payment. This will be included in reports..."
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    rows="4"
-                                />
-
-                                <div className="comment-actions">
-                                    <button
-                                        className="comment-save-btn"
-                                        onClick={saveComment}
-                                        disabled={savingComment || !newComment.trim()}
+                            <div className="card-body">
+                                {/* Transaction Filters */}
+                                <div className="transaction-filters">
+                                    <input
+                                        type="text"
+                                        placeholder="Search transactions..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="search-input"
+                                    />
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="status-filter"
                                     >
-                                        {savingComment ? 'Saving...' : commentSaved ? '✓ Saved' : 'Save Comment'}
+                                        <option value="">All Status</option>
+                                        <option value="success">Success</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="failed">Failed</option>
+                                        <option value="expired">Expired</option>
+                                    </select>
+                                </div>
+
+                                {transactionsLoading ? (
+                                    <div className="loading-transactions">
+                                        <div className="spinner"></div>
+                                        <div className="loading-text">Loading...</div>
+                                    </div>
+                                ) : filteredTransactions.length === 0 ? (
+                                    <div className="empty-transactions">
+                                        <div className="empty-icon">📄</div>
+                                        <div className="empty-text">
+                                            {searchTerm || statusFilter ? 'No matching transactions' : 'No transactions found'}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="transactions-table-container">
+                                            <table className="transactions-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Trans No</th>
+                                                        <th>Amount</th>
+                                                        <th>Status</th>
+                                                        <th>Date</th>
+                                                        <th>Initiator</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredTransactions.slice(0, 10).map((transaction) => {
+                                                        const { date, time } = formatDateTime(transaction.createdAt);
+                                                        const status = transaction.status?.toLowerCase();
+
+                                                        return (
+                                                            <tr 
+                                                                key={transaction._id || transaction.transactionId}
+                                                                className="transactions-table-row"
+                                                                onClick={() => handleTransactionClick(transaction)}
+                                                                style={{ cursor: 'pointer' }}
+                                                            >
+                                                                <td className="transaction-id">
+                                                                    {getTransactionNumber(transaction)}
+                                                                </td>
+                                                                <td className="amount-cell">
+                                                                    {formatCurrency(transaction.amount)}
+                                                                </td>
+                                                                <td>
+                                                                    <span
+                                                                        className="status-badge"
+                                                                        style={{
+                                                                            backgroundColor: status === 'success' ? '#d1fae5' :
+                                                                                status === 'pending' ? '#fef3c7' :
+                                                                                    status === 'failed' ? '#fee2e2' :
+                                                                                        '#f3f4f6',
+                                                                            color: status === 'success' ? '#059669' :
+                                                                                status === 'pending' ? '#d97706' :
+                                                                                    status === 'failed' ? '#dc2626' : '#6b7280',
+                                                                            border: `1px solid ${status === 'success' ? '#a7f3d0' :
+                                                                                status === 'pending' ? '#fde68a' :
+                                                                                    status === 'failed' ? '#fecaca' : '#d1d5db'}`
+                                                                        }}
+                                                                    >
+                                                                        {getStatusDisplayText(transaction.status, transaction.failureReason)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="date-cell">
+                                                                    <div className="date">{date}</div>
+                                                                    <div className="time">{time}</div>
+                                                                </td>
+                                                                <td className="initiator-cell">
+                                                                    {transaction.initiatedBy || 'Agent'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Total row */}
+                                        {(() => {
+                                            const successfulTotal = filteredTransactions
+                                                .filter(transaction => transaction.status?.toLowerCase() === 'success')
+                                                .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
+
+                                            return successfulTotal > 0 ? (
+                                                <div className="transactions-total">
+                                                    <div className="total-label">Total Successful:</div>
+                                                    <div className="total-amount">{formatCurrency(successfulTotal)}</div>
+                                                </div>
+                                            ) : null;
+                                        })()}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'promises' && (
+                    <div className="tab-content active" data-tab="promises">
+                        {/* Payment Promises Card - Full Width */}
+                        <div className="details-card promises-card">
+                            <div className="card-header">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '0.5rem' }}>
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                </svg>
+                                <Typography className="card-title">
+                                    Payment Promises
+                                </Typography>
+                                <button
+                                    className="new-promise-btn"
+                                    onClick={() => setShowPromiseModal(true)}
+                                >
+                                    + New Promise
+                                </button>
+                            </div>
+
+                            <div className="card-body">
+                                {promisesLoading ? (
+                                    <div className="loading-promises">
+                                        <div className="spinner"></div>
+                                        <div className="loading-text">Loading...</div>
+                                    </div>
+                                ) : promises.length === 0 ? (
+                                    <div className="empty-promises">
+                                        <div className="empty-icon"></div>
+
+                                        <button
+                                            onClick={() => setShowPromiseModal(true)}
+                                            className="create-promise-btn"
+                                        >
+                                            + Create First Promise
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="promises-list">
+                                            {promises.slice(0, 5).map((promise) => (
+                                                <div key={promise._id} className="promise-item">
+                                                    <div className="promise-header">
+                                                        <span className="promise-id">#{promise.promiseId}</span>
+                                                        <span className={`promise-status ${getPromiseStatusClass(promise.status)}`}>
+                                                            {promise.status}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="promise-details">
+                                                        <div className="promise-amount">
+                                                            {formatCurrency(promise.promiseAmount)}
+                                                        </div>
+                                                        <div className="promise-date">
+                                                            Due: {formatDate(promise.promiseDate)}
+                                                        </div>
+                                                        {promise.notes && (
+                                                            <div className="promise-notes">
+                                                                {promise.notes}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="promise-footer">
+                                                        <div className="promise-type">
+                                                            {promise.promiseType.replace('_', ' ')}
+                                                        </div>
+                                                        {promise.status === 'PENDING' && (
+                                                            <div className="promise-actions">
+                                                                <button
+                                                                    className="promise-action-btn fulfilled"
+                                                                    onClick={() => updatePromiseStatus(promise.promiseId, 'FULFILLED')}
+                                                                >
+                                                                    ✓ Fulfilled
+                                                                </button>
+                                                                <button
+                                                                    className="promise-action-btn broken"
+                                                                    onClick={() => updatePromiseStatus(promise.promiseId, 'BROKEN')}
+                                                                >
+                                                                    ✗ Broken
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="promises-summary">
+                                            <div className="summary-item">
+                                                <span className="summary-label">Pending:</span>
+                                                <span className="summary-value pending">
+                                                    {promises.filter(p => p.status === 'PENDING').length}
+                                                </span>
+                                            </div>
+                                            <div className="summary-item">
+                                                <span className="summary-label">Fulfilled:</span>
+                                                <span className="summary-value fulfilled">
+                                                    {promises.filter(p => p.status === 'FULFILLED').length}
+                                                </span>
+                                            </div>
+                                            <div className="summary-item">
+                                                <span className="summary-label">Broken:</span>
+                                                <span className="summary-value broken">
+                                                    {promises.filter(p => p.status === 'BROKEN').length}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Placeholder Card - 65% (Payment Processing Card Removed) */}
+                        <div className="details-card empty-card">
+                            <div className="card-header">
+                                <SendToMobile sx={{ fontSize: 14, marginRight: '0.5rem', color: '#5c4730' }} />
+                                <Typography className="card-title">
+                                    Payment Processing
+                                </Typography>
+                            </div>
+                            <div className="card-body">
+                                <div className="empty-state">
+                                    <div className="empty-icon">💳</div>
+                                    <Typography className="empty-title">
+                                        Payment Processing Moved
+                                    </Typography>
+                                    <Typography className="empty-text">
+                                        Use the "Prompt" button in the header to process payments
+                                    </Typography>
+                                    <button
+                                        className="process-payment-btn"
+                                        onClick={handleProcessPayment}
+                                        disabled={parseFloat(customer?.loanBalance || 0) <= 0 || hasActiveTransaction}
+                                        style={{ marginTop: '1rem' }}
+                                    >
+                                        <SendToMobile sx={{ fontSize: 16, marginRight: '0.5rem' }} />
+                                        {hasActiveTransaction ? `Active (${activeTransactionStatus})` : 'Process Payment'}
                                     </button>
                                 </div>
                             </div>
-
-                            {/* Comment History Section */}
-                            <div className="comment-history-section">
-                                <div className="comment-history-title">
-                                    Comment History
-                                    {commentsLoading && <span className="loading-indicator">Loading...</span>}
-                                </div>
-
-                                <div className="comment-history-container">
-                                    {commentsLoading ? (
-                                        <div className="loading-comments">
-                                            <Typography sx={{ color: '#666', textAlign: 'center', py: 2, fontSize: '0.875rem' }}>
-                                                Loading comments...
-                                            </Typography>
-                                        </div>
-                                    ) : commentHistory.length === 0 ? (
-                                        <div className="no-comments">
-                                            <div className="no-comments-icon">📝</div>
-                                            <Typography className="no-comments-text">
-                                                No comments yet. Add a comment above to start the conversation.
-                                            </Typography>
-                                        </div>
-                                    ) : (
-                                        commentHistory.map((commentItem) => (
-                                            <div key={commentItem._id} className="comment-history-item">
-                                                {commentItem.savedLocally && (
-                                                    <div className="local-comment-badge" title="Saved locally (not synced to server)">
-                                                        📱 Local
-                                                    </div>
-                                                )}
-                                                <div className="comment-history-content">
-                                                    {commentItem.comment}
-                                                </div>
-                                                <div className="comment-history-meta">
-                                                    <span className="comment-history-author">
-                                                        {commentItem.author || 'Agent'}
-                                                    </span>
-                                                    <span className="comment-history-date">
-                                                        {formatDate(commentItem.createdAt)}
-                                                        {commentItem.savedLocally && ' (Local)'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
                         </div>
                     </div>
-
-                    {/* Recent Transactions Card - SIMPLIFIED */}
-                    <div className="details-card transactions-card">
-                        <div className="card-header">
-                            <Typography className="card-title">
-                                Recent Transactions
-                            </Typography>
-                            <button
-                                className="customer-details-action-btn"
-                                onClick={handleRefreshTransactions}
-                                style={{
-                                    fontSize: '12px',
-                                    padding: '6px 12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-                                </svg>
-                                Refresh
-                            </button>
-                        </div>
-
-                        <div className="card-body simple-transactions-container">
-                            {/* Transaction Filters */}
-                            <div className="simple-filters">
-                                <input
-                                    type="text"
-                                    placeholder="Search transactions..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="simple-search-input"
-                                />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="simple-status-filter"
-                                >
-                                    <option value="">All Status</option>
-                                    <option value="success">Success</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="failed">Failed</option>
-                                    <option value="expired">Expired</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </div>
-
-                            {transactionsLoading ? (
-                                <div className="simple-loading">
-                                    <div className="simple-spinner"></div>
-                                    <div className="simple-loading-text">Loading transactions...</div>
-                                </div>
-                            ) : filteredTransactions.length === 0 ? (
-                                <div className="simple-empty-state">
-                                    <div className="simple-empty-icon">📄</div>
-                                    <div className="simple-empty-text">
-                                        {searchTerm || statusFilter ? 'No transactions match your filters' : 'No transactions found for this customer'}
-                                    </div>
-                                    {(searchTerm || statusFilter) && (
-                                        <button
-                                            onClick={() => {
-                                                setSearchTerm('');
-                                                setStatusFilter('');
-                                            }}
-                                            className="simple-clear-btn"
-                                        >
-                                            Clear Filters
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="simple-table-wrapper">
-                                        <table className="simple-transactions-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Transaction No</th>
-                                                    <th>Amount</th>
-                                                    <th>Status</th>
-                                                    <th>Date</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {filteredTransactions.map((transaction) => {
-                                                    const { date, time } = formatTransactionDate(transaction.createdAt);
-                                                    const status = transaction.status?.toLowerCase();
-
-                                                    return (
-                                                        <tr key={transaction._id || transaction.transactionId}>
-                                                            <td className="simple-transaction-id">
-                                                                {getTransactionNumber(transaction)}
-                                                            </td>
-                                                            <td className="simple-amount">
-                                                                {formatCurrency(transaction.amount)}
-                                                            </td>
-                                                            <td>
-                                                                <span
-                                                                    className="simple-status"
-                                                                    style={{
-                                                                        backgroundColor: status === 'success' ? '#d1fae5' :
-                                                                            status === 'pending' ? '#fef3c7' :
-                                                                                status === 'failed' ? '#fee2e2' :
-                                                                                    status === 'expired' ? '#f3f4f6' : '#f3f4f6',
-                                                                        color: status === 'success' ? '#059669' :
-                                                                            status === 'pending' ? '#d97706' :
-                                                                                status === 'failed' ? '#dc2626' : '#6b7280',
-                                                                        borderColor: status === 'success' ? '#a7f3d0' :
-                                                                            status === 'pending' ? '#fde68a' :
-                                                                                status === 'failed' ? '#fecaca' : '#d1d5db'
-                                                                    }}
-                                                                >
-                                                                    {getStatusDisplayText(transaction.status, transaction.failureReason)}
-                                                                </span>
-                                                            </td>
-                                                            <td className="simple-date">
-                                                                <div className="simple-date-text">{date}</div>
-                                                                <div className="simple-time-text">{time}</div>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Total row - Successful transactions only */}
-                                    {(() => {
-                                        const successfulTotal = filteredTransactions
-                                            .filter(transaction => transaction.status?.toLowerCase() === 'success')
-                                            .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
-
-                                        return successfulTotal > 0 ? (
-                                            <div className="simple-total-row">
-                                                <div className="simple-total-label">Total Successful:</div>
-                                                <div className="simple-total-amount">{formatCurrency(successfulTotal)}</div>
-                                            </div>
-                                        ) : null;
-                                    })()}
-
-                                    <div className="simple-count">
-                                        Showing {filteredTransactions.length} of {transactions.length} transactions
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
 
-            {/* Payment Modal - UPDATED WITH SUCCESS MESSAGE INSIDE */}
+            {/* Payment Modal */}
             {showPaymentModal && (
                 <div className="payment-modal-overlay-customer">
                     <div className="payment-modal-customer">
@@ -1417,31 +1917,7 @@ const CustomerDetails = () => {
                         </div>
 
                         <div className="payment-modal-body-customer">
-                            {/* Success Message displayed right under the header */}
-                            {mpesaStatus && mpesaStatus.status === 'success' && (
-                                <div className="mpesa-status-inline-customer success">
-                                    <div className="mpesa-status-icon-customer">✅</div>
-                                    <div className="mpesa-status-content-customer">
-                                        <div className="mpesa-status-message-customer">{mpesaStatus.message}</div>
-                                        {mpesaStatus.details && (
-                                            <div className="mpesa-status-details-customer">{mpesaStatus.details}</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Failed Message */}
-                            {mpesaStatus && mpesaStatus.status === 'failed' && (
-                                <div className="mpesa-status-inline-customer failed">
-                                    <div className="mpesa-status-icon-customer">❌</div>
-                                    <div className="mpesa-status-content-customer">
-                                        <div className="mpesa-status-message-customer">{mpesaStatus.message}</div>
-                                        {mpesaStatus.details && (
-                                            <div className="mpesa-status-details-customer">{mpesaStatus.details}</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            
 
                             {/* Only show form if payment hasn't been successfully initiated */}
                             {(!mpesaStatus || mpesaStatus.status !== 'success') ? (
@@ -1576,7 +2052,7 @@ const CustomerDetails = () => {
                             ) : (
                                 // Show only success message when payment is successful
                                 <div className="whatsapp-success-details-customer">
-                                    
+
                                     <Typography className="whatsapp-success-title-customer">
                                         Payment Request Sent!
                                     </Typography>
@@ -1608,36 +2084,148 @@ const CustomerDetails = () => {
                             )}
                         </div>
 
+                        {/* payment modal footer section */}
                         <div className="payment-modal-footer-customer">
-                            {/* Always show Close button */}
-                            <button
-                                className="payment-modal-cancel-btn-customer"
-                                onClick={closePaymentModal}
-                            >
-                                Close
-                            </button>
+                            {/* Show Sent button when payment is successfully sent */}
 
-                            {/* Show Processing button when payment is being processed */}
-                            {(processingPayment || (mpesaStatus && mpesaStatus.status === 'success')) && (
+                            {mpesaStatus && mpesaStatus.status === 'success' ? (
+                                <button
+                                    className="payment-modal-sent-btn-customer"
+                                    onClick={closePaymentModal}
+                                >
+                                    Sent
+                                </button>
+                            ) : processingPayment ? (
                                 <button
                                     className="payment-modal-processing-btn-customer"
                                     disabled={true}
                                 >
                                     <div className="processing-spinner"></div>
-                                    Waiting for PIN...
+                                    Sending...
                                 </button>
+                            ) : (
+                                <>
+                                    <button
+                                        className="payment-modal-cancel-btn-customer"
+                                        onClick={closePaymentModal}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="payment-modal-prompt-btn-customer"
+                                        onClick={handleSendPrompt}
+                                        disabled={!paymentData.phoneNumber || !paymentData.amount}
+                                    >
+                                        Send Payment Request
+                                    </button>
+                                </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                            {/* Show Initiate Payment button only when form is visible */}
-                            {(!mpesaStatus || mpesaStatus.status !== 'success') && !processingPayment && (
-                                <button
-                                    className="payment-modal-prompt-btn-customer"
-                                    onClick={handleSendPrompt}
-                                    disabled={!paymentData.phoneNumber || !paymentData.amount}
+            {/* Add Promise Modal */}
+            {showPromiseModal && (
+                <div className="payment-modal-overlay-customer">
+                    <div className="payment-modal-customer" style={{ maxWidth: '500px' }}>
+                        <div className="payment-modal-header-customer">
+                            <Typography className="payment-modal-title-customer">
+                                Create Payment Promise
+                            </Typography>
+                        </div>
+
+                        <div className="payment-modal-body-customer">
+                            <div className="payment-info-container-customer">
+                                <div className="payment-info-item-customer">
+                                    <span className="payment-info-label-customer">Customer:</span>
+                                    <span className="payment-info-value-customer">{customer?.name}</span>
+                                </div>
+                                <div className="payment-info-item-customer">
+                                    <span className="payment-info-label-customer">Arrears:</span>
+                                    <span className="payment-info-value-customer">{formatCurrency(customer?.arrears)}</span>
+                                </div>
+                            </div>
+
+                            <div className="payment-form-group-customer">
+                                <label className="payment-form-label-customer">Promise Amount (KES)</label>
+                                <input
+                                    type="number"
+                                    name="promiseAmount"
+                                    value={promiseData.promiseAmount}
+                                    onChange={(e) => setPromiseData({ ...promiseData, promiseAmount: e.target.value })}
+                                    className="payment-form-input-customer"
+                                    placeholder="Enter promise amount"
+                                    min="1"
+                                    max={customer?.arrears || 1000000}
+                                    step="1"
+                                />
+                            </div>
+
+                            <div className="payment-form-group-customer">
+                                <label className="payment-form-label-customer">Promise Date</label>
+                                <input
+                                    type="date"
+                                    name="promiseDate"
+                                    value={promiseData.promiseDate}
+                                    onChange={(e) => setPromiseData({ ...promiseData, promiseDate: e.target.value })}
+                                    className="payment-form-input-customer"
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+
+                            <div className="payment-form-group-customer">
+                                <label className="payment-form-label-customer">Promise Type</label>
+                                <select
+                                    name="promiseType"
+                                    value={promiseData.promiseType}
+                                    onChange={(e) => setPromiseData({ ...promiseData, promiseType: e.target.value })}
+                                    className="payment-form-input-customer"
                                 >
-                                    Send Payment Request
-                                </button>
-                            )}
+                                    <option value="FULL_PAYMENT">Full Payment</option>
+                                    <option value="PARTIAL_PAYMENT">Partial Payment</option>
+                                    <option value="SETTLEMENT">Settlement</option>
+                                    <option value="PAYMENT_PLAN">Payment Plan</option>
+                                </select>
+                            </div>
+
+                            <div className="payment-form-group-customer">
+                                <label className="payment-form-label-customer">Notes (Optional)</label>
+                                <textarea
+                                    name="notes"
+                                    value={promiseData.notes}
+                                    onChange={(e) => setPromiseData({ ...promiseData, notes: e.target.value })}
+                                    className="payment-form-input-customer"
+                                    placeholder="Add notes about this promise..."
+                                    rows="3"
+                                    style={{ resize: 'vertical', minHeight: '60px' }}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="payment-modal-footer-customer">
+                            <button
+                                className="payment-modal-cancel-btn-customer"
+                                onClick={() => {
+                                    setShowPromiseModal(false);
+                                    setPromiseData({
+                                        promiseAmount: '',
+                                        promiseDate: '',
+                                        promiseType: 'FULL_PAYMENT',
+                                        notes: ''
+                                    });
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="payment-modal-prompt-btn-customer"
+                                onClick={createPromise}
+                                disabled={!promiseData.promiseAmount || !promiseData.promiseDate}
+                                style={{ background: '#8B7355' }}
+                            >
+                                Create Promise
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1709,6 +2297,225 @@ const CustomerDetails = () => {
                     </div>
                 </div>
             )}
+
+            {/* Transaction Details Modal */}
+            <Modal
+                open={transactionModalOpen}
+                onClose={handleCloseTransactionModal}
+                aria-labelledby="transaction-details-modal"
+                aria-describedby="transaction-details-description"
+            >
+                <Box className="transaction-modal-container">
+                    {selectedTransaction && (
+                        <div className="transaction-modal-content">
+                            {/* Modal Header */}
+                            <div className="transaction-modal-header">
+                                <div className="transaction-modal-header-content">
+                                    <ReceiptLong sx={{ fontSize: 20, color: '#5c4730' }} />
+                                    <div>
+                                        <Typography className="transaction-modal-title">
+                                            Transaction Details
+                                        </Typography>
+                                        <Typography className="transaction-modal-subtitle">
+                                            {selectedTransaction.transactionId || selectedTransaction._id}
+                                        </Typography>
+                                    </div>
+                                </div>
+                                <IconButton
+                                    onClick={handleCloseTransactionModal}
+                                    className="transaction-modal-close-btn"
+                                    size="small"
+                                >
+                                    <Close />
+                                </IconButton>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="transaction-modal-body">
+                                <div className="transaction-details-grid-compact">
+                                    {/* Left Column */}
+                                    <div className="transaction-column-compact">
+                                        {/* Customer Information Card */}
+                                        <div className="transaction-card-compact">
+                                            <div className="transaction-card-header-compact">
+                                                <PersonIcon sx={{ fontSize: 14, color: '#5c4730' }} />
+                                                <span>Customer Information</span>
+                                            </div>
+                                            <div className="transaction-card-content-compact">
+                                                <div className="transaction-detail-item-compact">
+                                                    <span className="transaction-detail-label-compact">Name</span>
+                                                    <span className="transaction-detail-value-compact">
+                                                        {selectedTransaction.customerId?.name || selectedTransaction.customerName || customer?.name || 'N/A'}
+                                                    </span>
+                                                </div>
+                                                <div className="transaction-detail-item-compact">
+                                                    <span className="transaction-detail-label-compact">Phone</span>
+                                                    <span className="transaction-detail-value-compact">
+                                                        {selectedTransaction.phoneNumber || customer?.phoneNumber || 'N/A'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Transaction Information Card */}
+                                        <div className="transaction-card-compact">
+                                            <div className="transaction-card-header-compact">
+                                                <Payment sx={{ fontSize: 14, color: '#5c4730' }} />
+                                                <span>Transaction Information</span>
+                                            </div>
+                                            <div className="transaction-card-content-compact">
+                                                <div className="transaction-detail-item-compact">
+                                                    <span className="transaction-detail-label-compact">Date & Time</span>
+                                                    <span className="transaction-detail-value-compact">
+                                                        {formatDateTime(selectedTransaction.createdAt).full}
+                                                    </span>
+                                                </div>
+                                                <div className="transaction-detail-item-compact">
+                                                    <span className="transaction-detail-label-compact">Payment Method</span>
+                                                    <span className="transaction-detail-value-compact">
+                                                        {selectedTransaction.paymentMethod || 'MPesa'}
+                                                    </span>
+                                                </div>
+                                                <div className="transaction-detail-item-compact">
+                                                    <span className="transaction-detail-label-compact">Amount</span>
+                                                    <span className="transaction-detail-value-compact amount-highlight">
+                                                        {formatCurrency(selectedTransaction.amount)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column */}
+                                    <div className="transaction-column-compact">
+                                        {/* Loan Balance Summary Card */}
+                                        <div className="transaction-card-compact loan-card-compact">
+                                            <div className="transaction-card-header-compact">
+                                                <AccountBalanceIcon sx={{ fontSize: 14, color: '#5c4730' }} />
+                                                <span>Loan Balance Summary</span>
+                                            </div>
+                                            <div className="transaction-card-content-compact">
+                                                {(() => {
+                                                    const loanDetails = calculateLoanDetails(selectedTransaction);
+                                                    return (
+                                                        <>
+                                                            <div className="transaction-detail-item-compact highlighted-compact">
+                                                                <span className="transaction-detail-label-compact">
+                                                                    Current Loan Balance
+                                                                </span>
+                                                                <span className="transaction-detail-value-compact balance-amount">
+                                                                    {formatCurrency(loanDetails.totalLoanBalance)}
+                                                                </span>
+                                                            </div>
+
+                                                            {loanDetails.arrearsAmount > 0 && (
+                                                                <div className="transaction-detail-item-compact arrears-info-compact">
+                                                                    <span className="transaction-detail-label-compact">
+                                                                        Arrears Balance
+                                                                    </span>
+                                                                    <span className="transaction-detail-value-compact arrears-amount">
+                                                                        {formatCurrency(loanDetails.arrearsAmount)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="transaction-detail-item-compact success-compact">
+                                                                <span className="transaction-detail-label-compact">
+                                                                    Total Repayments Made
+                                                                </span>
+                                                                <span className="transaction-detail-value-compact success-amount">
+                                                                    {formatCurrency(loanDetails.totalRepayments)}
+                                                                </span>
+                                                            </div>
+
+                                                            {selectedTransaction.status?.toUpperCase() === 'SUCCESS' ? (
+                                                                <>
+                                                                    <div className="transaction-detail-item-compact total-cleared-compact">
+                                                                        <span className="transaction-detail-label-compact">
+                                                                            Total Cleared Now
+                                                                        </span>
+                                                                        <span className="transaction-detail-value-compact total-success-amount">
+                                                                            {formatCurrency(loanDetails.totalCleared)}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div className="transaction-detail-item-compact new-balance-compact">
+                                                                        <span className="transaction-detail-label-compact">
+                                                                            New Loan Balance
+                                                                        </span>
+                                                                        <span className={`transaction-detail-value-compact ${loanDetails.isPaidOff ? 'paid-off-amount' : 'new-balance-amount'}`}>
+                                                                            {formatCurrency(loanDetails.newLoanBalance)}
+                                                                            {loanDetails.isPaidOff && (
+                                                                                <span className="paid-off-badge-compact">
+                                                                                    <DoneAll sx={{ fontSize: 10, marginLeft: '0.25rem' }} />
+                                                                                    PAID OFF
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <div className="transaction-detail-item-compact">
+                                                                    <span className="transaction-detail-label-compact">
+                                                                        Status Note
+                                                                    </span>
+                                                                    <span className="transaction-detail-value-compact pending-note-compact">
+                                                                        Payment not processed. Loan balance remains unchanged.
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+
+                                        {/* Transaction Status Card */}
+                                        <div className="transaction-card-compact status-card-compact">
+                                            <div className="transaction-card-header-compact">
+                                                <ReceiptLong sx={{ fontSize: 14, color: '#5c4730' }} />
+                                                <span>Transaction Status</span>
+                                            </div>
+                                            <div className="transaction-status-wrapper-compact">
+                                                {(() => {
+                                                    const statusProps = getStatusProps(selectedTransaction.status);
+                                                    return (
+                                                        <div className={`transaction-status-display-compact ${statusProps.class}`}>
+                                                            <div className="status-icon-compact">
+                                                                {statusProps.icon}
+                                                            </div>
+                                                            <div>
+                                                                <div className="transaction-status-text-compact">{statusProps.text}</div>
+                                                                <div className="transaction-status-message-compact">
+                                                                    {selectedTransaction.status?.toUpperCase() === 'SUCCESS'
+                                                                        ? 'Payment successfully processed and applied to loan balance'
+                                                                        : selectedTransaction.status?.toUpperCase() === 'PENDING'
+                                                                            ? 'Payment is being processed. Loan balance will update upon completion.'
+                                                                            : 'Transaction not completed. No changes to loan balance.'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="transaction-modal-footer">
+                                <button
+                                    className="transaction-modal-secondary-btn"
+                                    onClick={handleCloseTransactionModal}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </Box>
+            </Modal>
         </Box>
     );
 };

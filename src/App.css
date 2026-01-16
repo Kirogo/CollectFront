@@ -1,4 +1,6 @@
-/* src/App.css - Minimal main styles */
+/* src/App.css - UPDATED WITH BETTER SPACING AND FIXED NAVBAR OVERLAP */
+
+/* Reset and base styles */
 * {
   margin: 0;
   padding: 0;
@@ -12,13 +14,83 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #333;
+  background: #f8f9fa;
 }
 
-.App {
+/* App layout */
+.app-container {
+  display: flex;
   min-height: 100vh;
+  width: 100%;
+  background: #f8f9fa;
 }
 
-/* Remove any conflicting login styles from previous versions */
-.login-container-old {
-  display: none;
+/* Main content wrapper - INCREASED margin for better spacing */
+.main-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: 205px; /* Increased from 200px to 205px for more space */
+  transition: margin-left 0.3s ease;
+  width: calc(100% - 205px);
+}
+
+.main-content-wrapper.collapsed {
+  margin-left: 60px; /* Increased from 55px to 60px for more space */
+  width: calc(100% - 60px);
+}
+
+/* Main content area - FIXED: Added padding-top to push content below navbar */
+.main-content {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  background: #f8f9fa;
+  min-height: 100vh;
+  padding-top: 70px; /* Added to push content below navbar */
+}
+
+/* Dashboard specific - add padding for content */
+.dashboard-wrapper {
+  padding: 1.5rem; /* Increased padding */
+  width: 100%;
+  min-height: calc(100vh - 70px); /* Account for navbar */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .main-content-wrapper {
+    margin-left: 195px; /* Increased from 190px to 195px */
+    width: calc(100% - 195px);
+  }
+  
+  .main-content-wrapper.collapsed {
+    margin-left: 55px; /* Increased from 50px to 55px */
+    width: calc(100% - 55px);
+  }
+  
+  .main-content {
+    padding-top: 65px; /* Slightly smaller on mobile */
+  }
+  
+  .dashboard-wrapper {
+    padding: 1rem;
+    min-height: calc(100vh - 65px);
+  }
+}
+
+@media (max-width: 576px) {
+  .main-content-wrapper {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .main-content {
+    padding-top: 60px;
+  }
+  
+  .dashboard-wrapper {
+    padding: 0.75rem;
+    min-height: calc(100vh - 60px);
+  }
 }

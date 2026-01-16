@@ -1,4 +1,4 @@
-// src/pages/TransactionsPage.jsx - FIXED VERSION
+// src/pages/TransactionsPage.jsx - UPDATED WITH DASHBOARD STYLING
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,16 +19,12 @@ import {
   HourglassEmpty,
   Close,
   Person,
-  Phone,
-  CalendarToday,
   Payment,
   ReceiptLong,
-  CreditCard,
   AccountBalance,
-  Money,
-  TrendingDown,
   DoneAll,
-  Warning
+  Search,
+  FilterList
 } from '@mui/icons-material';
 import axios from 'axios';
 import '../styles/transactionspage.css';
@@ -46,20 +42,6 @@ const TransactionsPage = () => {
   const [error, setError] = useState(null);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-
-  // Payment modal states
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [paymentData, setPaymentData] = useState({
-    phoneNumber: '',
-    alternativePhoneNumber: '',
-    amount: '',
-    useAlternativeNumber: false
-  });
-  const [mpesaStatus, setMpesaStatus] = useState(null);
-  const [processingPayment, setProcessingPayment] = useState(false);
-
-  // Store customer details for accurate loan balance
   const [customerDetails, setCustomerDetails] = useState(null);
 
   const fetchTransactions = async () => {
@@ -121,7 +103,6 @@ const TransactionsPage = () => {
     }
   };
 
-  // Fetch customer details for accurate loan balance
   const fetchCustomerDetails = async (customerId) => {
     if (!customerId) return null;
 
@@ -134,7 +115,6 @@ const TransactionsPage = () => {
       });
 
       if (response.data.success) {
-        console.log('Customer details fetched:', response.data.data.customer);
         return response.data.data.customer;
       }
       return null;
@@ -273,24 +253,14 @@ const TransactionsPage = () => {
     }
   };
 
-  // Handle transaction click - FIXED
+  // Handle transaction click
   const handleTransactionClick = async (transaction) => {
     setSelectedTransaction(transaction);
 
-    // Debug logging
-    console.log('Transaction clicked:', {
-      transaction,
-      customerId: transaction.customerId,
-      customerName: transaction.customerId?.name,
-      customerDataStructure: JSON.stringify(transaction.customerId, null, 2)
-    });
-
-    // Fetch the latest customer details for accurate loan balance
     if (transaction.customerId?._id || transaction.customerId) {
       const customerId = transaction.customerId._id || transaction.customerId;
       const details = await fetchCustomerDetails(customerId);
       setCustomerDetails(details);
-      console.log('Customer details fetched:', details);
     } else {
       setCustomerDetails(null);
     }
@@ -313,25 +283,6 @@ const TransactionsPage = () => {
       return date.toLocaleDateString('en-KE', {
         month: 'short',
         day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
-
-  // Format date for modal
-  const formatDetailedDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-KE', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
@@ -342,7 +293,6 @@ const TransactionsPage = () => {
 
   // Calculate loan details based on actual customer data
   const calculateLoanDetails = (transaction) => {
-    // Use customerDetails if available, otherwise fall back to transaction data
     const currentCustomerData = customerDetails || transaction.customerId;
 
     const transactionAmount = parseFloat(transaction.amount || 0);
@@ -350,9 +300,7 @@ const TransactionsPage = () => {
     const arrearsAmount = parseFloat(currentCustomerData?.arrears || currentCustomerData?.arrearsBalance || 0);
     const totalRepayments = parseFloat(currentCustomerData?.totalRepayments || 0);
 
-    // For successful transactions, calculate cleared arrears and remaining balances
     if (transaction.status?.toUpperCase() === 'SUCCESS') {
-      // Assume transaction clears arrears first, then principal
       const arrearsCleared = Math.min(transactionAmount, arrearsAmount);
       const principalPaid = Math.max(0, transactionAmount - arrearsCleared);
       const remainingArrears = Math.max(0, arrearsAmount - arrearsCleared);
@@ -375,7 +323,6 @@ const TransactionsPage = () => {
         hasArrears: remainingArrears > 0
       };
     } else {
-      // For non-successful transactions, show current state
       return {
         transactionAmount,
         totalLoanBalance,
@@ -393,226 +340,28 @@ const TransactionsPage = () => {
     }
   };
 
-  // handleRetryPayment function - FIXED
-  // handleRetryPayment function - FINAL FIX
-  const handleRetryPayment = async () => {
-    if (!selectedTransaction) return;
-
-    try {
-      setProcessingPayment(true);
-
-      console.log('=== RETRY PAYMENT DEBUG ===');
-      console.log('Selected Transaction:', selectedTransaction);
-      console.log('Customer ID from transaction:', selectedTransaction.customerId);
-      console.log('Customer Details state:', customerDetails);
-
-      // Extract customer ID from transaction
-      let customerId = null;
-      if (typeof selectedTransaction.customerId === 'string') {
-        customerId = selectedTransaction.customerId;
-      } else if (selectedTransaction.customerId?._id) {
-        customerId = selectedTransaction.customerId._id;
-      }
-
-      console.log('Extracted Customer ID:', customerId);
-
-      // Try to get customer data from state first, then fetch if needed
-      let currentCustomerData = customerDetails;
-
-      if (!currentCustomerData && customerId) {
-        console.log('Fetching customer details for ID:', customerId);
-        currentCustomerData = await fetchCustomerDetails(customerId);
-
-        if (currentCustomerData) {
-          setCustomerDetails(currentCustomerData);
-          console.log('Customer details fetched:', currentCustomerData);
-        }
-      }
-
-      // Set payment data
-      setPaymentData({
-        phoneNumber: currentCustomerData?.phoneNumber ||
-          selectedTransaction.phoneNumber ||
-          selectedTransaction.customerId?.phoneNumber ||
-          '',
-        alternativePhoneNumber: '',
-        amount: currentCustomerData?.arrears ||
-          selectedTransaction.amount ||
-          '',
-        useAlternativeNumber: false
-      });
-
-      console.log('Payment Data set:', {
-        phoneNumber: paymentData.phoneNumber,
-        amount: paymentData.amount,
-        currentCustomerData
-      });
-
-      // Close the transaction modal and open payment modal
-      setModalOpen(false);
-      setShowPaymentModal(true);
-      setMpesaStatus(null);
-
-    } catch (error) {
-      console.error('Error preparing payment:', error);
-      setError(`Failed to load customer details for payment: ${error.message}`);
-
-      // Still open payment modal with transaction data as fallback
-      setPaymentData({
-        phoneNumber: selectedTransaction.phoneNumber || '',
-        alternativePhoneNumber: '',
-        amount: selectedTransaction.amount || '',
-        useAlternativeNumber: false
-      });
-
-      setModalOpen(false);
-      setShowPaymentModal(true);
-      setMpesaStatus(null);
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
-  const handlePaymentInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setPaymentData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleQuickAmount = (amount, type = 'arrears') => {
-    const customer = customerDetails || selectedTransaction?.customerId;
-
-    if (type === 'fullBalance') {
-      // Show full balance amount
-      setPaymentData(prev => ({
-        ...prev,
-        amount: customer?.loanBalance || amount
-      }));
-    } else {
-      // Set arrears amount
-      setPaymentData(prev => ({
-        ...prev,
-        amount
-      }));
-    }
-  };
-
-  const handleSendPrompt = () => {
-    // Determine which phone number to use
-    const phoneToUse = paymentData.useAlternativeNumber
-      ? paymentData.alternativePhoneNumber
-      : paymentData.phoneNumber;
-
-    if (!phoneToUse || !paymentData.amount) {
-      setError('Please enter phone number and amount');
-      return;
-    }
-
-    if (phoneToUse.length !== 12 || !phoneToUse.startsWith('254')) {
-      setError('Please enter a valid Kenyan phone number (254XXXXXXXXX)');
-      return;
-    }
-
-    // Check daily limit
-    const amountNum = parseFloat(paymentData.amount);
-    if (amountNum > 496500) {
-      setError(`Daily MPESA limit exceeded. Maximum allowed is ${formatCurrency(496500)}`);
-      return;
-    }
-
-    setShowConfirmationModal(true);
-  };
-
-  const handleConfirmPayment = async () => {
-    try {
-      setProcessingPayment(true);
-      setShowConfirmationModal(false);
-
-      const token = localStorage.getItem('token');
-
-      // Determine which phone number to use
-      const phoneToUse = paymentData.useAlternativeNumber
-        ? paymentData.alternativePhoneNumber
-        : paymentData.phoneNumber;
-
-      const response = await axios.post(
-        'http://localhost:5000/api/payments/initiate',
-        {
-          phoneNumber: phoneToUse,
-          amount: parseFloat(paymentData.amount),
-          description: `Loan repayment${selectedTransaction?.customerId?.name ? ` for ${selectedTransaction.customerId.name}` : ''}`,
-          customerId: selectedTransaction?.customerId?._id || selectedTransaction?.customerId,
-          isAlternativeNumber: paymentData.useAlternativeNumber,
-          originalPhoneNumber: paymentData.phoneNumber
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.data.success) {
-        setMpesaStatus({
-          status: 'pending',
-          message: 'STK Push initiated successfully!',
-          checkoutId: response.data.data.transaction?.transactionId,
-          phoneUsed: phoneToUse
-        });
-
-        // Refresh transactions after 5 seconds
-        setTimeout(() => {
-          fetchTransactions();
-        }, 5000);
-      } else {
-        setMpesaStatus({
-          status: 'failed',
-          message: response.data.message || 'Failed to initiate payment'
-        });
-      }
-    } catch (error) {
-      console.error('Error sending payment request:', error);
-      setMpesaStatus({
-        status: 'failed',
-        message: error.response?.data?.message || 'Failed to send payment request. Please try again.'
-      });
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
-  // Stats data
+  // Stats data - 3 cards matching dashboard
   const statsData = [
-    {
-      label: 'Total Transactions',
-      value: stats?.totalTransactions || 0,
-      icon: <Receipt />,
-      iconBg: 'linear-gradient(135deg, #5c4730, #3c2a1c)',
-      meta: 'All time transactions'
-    },
     {
       label: 'Total Amount',
       value: formatCurrency(stats?.totalAmount || 0),
       icon: <AccountBalanceWallet />,
-      iconBg: 'linear-gradient(135deg, #5c4730, #3c2a1c)',
+      iconBg: 'linear-gradient(135deg, #d4a762, #5c4730)',
       meta: 'Total value processed'
     },
     {
       label: 'Successful',
       value: stats?.successfulTransactions || 0,
       icon: <CheckCircle />,
-      iconBg: 'linear-gradient(135deg, #5c4730, #3c2a1c)',
+      iconBg: 'linear-gradient(135deg, #d4a762, #5c4730)',
       meta: 'Completed payments'
     },
     {
       label: 'Pending',
       value: stats?.pendingTransactions || 0,
       icon: <HourglassEmpty />,
-      iconBg: 'linear-gradient(135deg, #5c4730, #3c2a1c)',
-      meta: 'Pending payments'
+      iconBg: 'linear-gradient(135deg, #d4a762, #5c4730)',
+      meta: 'Awaiting completion'
     }
   ];
 
@@ -623,20 +372,20 @@ const TransactionsPage = () => {
         <div className="transactions-header-content">
           <Box>
             <Typography className="transactions-title">
-              Transaction History
+              Transactions
             </Typography>
             <Typography className="transactions-subtitle">
               View and manage all payment transactions
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <button
               className="transactions-action-btn"
               onClick={fetchTransactions}
               disabled={loading}
             >
-              <Refresh sx={{ fontSize: 18 }} />
+              <Refresh sx={{ fontSize: 16 }} />
               Refresh
             </button>
             <button
@@ -644,14 +393,14 @@ const TransactionsPage = () => {
               onClick={handleExportData}
               disabled={exportLoading}
             >
-              <Download sx={{ fontSize: 18 }} />
+              <Download sx={{ fontSize: 16 }} />
               {exportLoading ? 'Exporting...' : 'Export'}
             </button>
           </Box>
         </div>
       </Box>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - 3 cards */}
       <div className="transactions-stats-grid">
         {statsData.map((stat, index) => (
           <div key={index} className="transactions-stat-card">
@@ -682,7 +431,7 @@ const TransactionsPage = () => {
           <div className="transactions-section-header">
             <Box>
               <Typography className="transactions-section-title">
-                TRANSACTION LIST
+                TRANSACTIONS ({transactions.length})
               </Typography>
             </Box>
 
@@ -690,7 +439,7 @@ const TransactionsPage = () => {
             <div className="transactions-search-container">
               <input
                 type="text"
-                placeholder="Search by customer, phone, or transaction ID..."
+                placeholder="Search by customer, phone, or ID..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -724,16 +473,11 @@ const TransactionsPage = () => {
           )}
 
           {loading ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <LinearProgress sx={{
-                mb: 2,
-                borderRadius: '4px',
-                backgroundColor: '#f5f0ea',
-                '& .MuiLinearProgress-bar': {
-                  backgroundColor: '#5c4730'
-                }
-              }} />
-              <Typography sx={{ color: '#666' }}>Loading transactions...</Typography>
+            <Box className="transactions-loading">
+              <LinearProgress />
+              <Typography className="transactions-loading-text">
+                Loading transactions...
+              </Typography>
             </Box>
           ) : !transactions || transactions.length === 0 ? (
             <div className="transactions-empty-state">
@@ -750,7 +494,7 @@ const TransactionsPage = () => {
           ) : filteredTransactions.length === 0 ? (
             <div className="transactions-empty-state">
               <div className="transactions-empty-icon">
-                <HourglassEmpty sx={{ fontSize: 48, color: '#d4a762' }} />
+                <Search sx={{ fontSize: 48, color: '#d4a762' }} />
               </div>
               <Typography className="transactions-empty-title">
                 No Matching Transactions
@@ -761,16 +505,16 @@ const TransactionsPage = () => {
             </div>
           ) : (
             <>
-              <div className="transactions-table-container">
-                <table className="transactions-table">
+              <div className="transactionspage-table-container">
+                <table className="transactionspage-table">
                   <thead>
                     <tr>
-                      <th className="col-id">Transaction ID</th>
-                      <th className="col-customer">Customer</th>
-                      <th className="col-phone">Phone</th>
-                      <th className="col-amount">Amount</th>
-                      <th className="col-status">Status</th>
-                      <th className="col-date">Date & Time</th>
+                      <th>Transaction ID</th>
+                      <th>Customer</th>
+                      <th>Phone</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Date & Time</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -779,20 +523,20 @@ const TransactionsPage = () => {
                       return (
                         <tr
                           key={transaction._id || transaction.transactionId || `transaction-${index}`}
-                          className="transactions-table-row clickable-row"
+                          className="transactions-table-row"
                           onClick={() => handleTransactionClick(transaction)}
                         >
-                          <td title={transaction.transactionId || transaction._id || `TRX-${index}`}>
+                          <td>
                             <span className="transaction-id">
                               {transaction.transactionId || transaction._id || `TRX-${index}`}
                             </span>
                           </td>
-                          <td title={transaction.customerId?.name || transaction.customerName || 'N/A'}>
+                          <td>
                             <span className="transaction-customer">
                               {transaction.customerId?.name || transaction.customerName || 'N/A'}
                             </span>
                           </td>
-                          <td title={transaction.phoneNumber || 'N/A'}>
+                          <td>
                             <span className="transaction-phone">
                               {transaction.phoneNumber || 'N/A'}
                             </span>
@@ -803,11 +547,11 @@ const TransactionsPage = () => {
                             </span>
                           </td>
                           <td>
-                            <span className={`transactions-status-chip ${statusProps.class}`} title={statusProps.text}>
-                              <span className="status-text">{statusProps.text}</span>
+                            <span className={`transactions-status-chip ${statusProps.class}`}>
+                              {statusProps.text}
                             </span>
                           </td>
-                          <td title={formatDate(transaction.createdAt)}>
+                          <td>
                             <span className="transaction-date">
                               {formatDate(transaction.createdAt)}
                             </span>
@@ -873,7 +617,7 @@ const TransactionsPage = () => {
               {/* Modal Header */}
               <div className="transaction-modal-header">
                 <div className="transaction-modal-header-content">
-                  <ReceiptLong sx={{ fontSize: 24, color: '#5c4730' }} />
+                  <ReceiptLong sx={{ fontSize: 20, color: '#5c4730' }} />
                   <div>
                     <Typography className="transaction-modal-title">
                       Transaction Details
@@ -883,28 +627,16 @@ const TransactionsPage = () => {
                     </Typography>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {/* Retry Payment Button in Header */}
-                  {selectedTransaction.status?.toUpperCase() === 'PENDING' && (
-                    <button
-                      className="transactions-primary-btn"
-                      onClick={handleRetryPayment}
-                      style={{ padding: '0.375rem 0.75rem', fontSize: '0.75rem' }}
-                    >
-                      Retry Payment
-                    </button>
-                  )}
-                  <IconButton
-                    onClick={handleCloseModal}
-                    className="transaction-modal-close-btn"
-                    size="small"
-                  >
-                    <Close />
-                  </IconButton>
-                </div>
+                <IconButton
+                  onClick={handleCloseModal}
+                  className="transaction-modal-close-btn"
+                  size="small"
+                >
+                  <Close />
+                </IconButton>
               </div>
 
-              {/* Transaction Details Grid - COMPACT DESIGN */}
+              {/* Modal Body */}
               <div className="transaction-modal-body">
                 <div className="transaction-details-grid-compact">
                   {/* Left Column */}
@@ -912,7 +644,7 @@ const TransactionsPage = () => {
                     {/* Customer Information Card */}
                     <div className="transaction-card-compact">
                       <div className="transaction-card-header-compact">
-                        <Person sx={{ fontSize: 16, color: '#5c4730' }} />
+                        <Person sx={{ fontSize: 14, color: '#5c4730' }} />
                         <span>Customer Information</span>
                       </div>
                       <div className="transaction-card-content-compact">
@@ -934,14 +666,14 @@ const TransactionsPage = () => {
                     {/* Transaction Information Card */}
                     <div className="transaction-card-compact">
                       <div className="transaction-card-header-compact">
-                        <Payment sx={{ fontSize: 16, color: '#5c4730' }} />
+                        <Payment sx={{ fontSize: 14, color: '#5c4730' }} />
                         <span>Transaction Information</span>
                       </div>
                       <div className="transaction-card-content-compact">
                         <div className="transaction-detail-item-compact">
                           <span className="transaction-detail-label-compact">Date & Time</span>
                           <span className="transaction-detail-value-compact">
-                            {formatDetailedDate(selectedTransaction.createdAt)}
+                            {formatDate(selectedTransaction.createdAt)}
                           </span>
                         </div>
                         <div className="transaction-detail-item-compact">
@@ -965,7 +697,7 @@ const TransactionsPage = () => {
                     {/* Loan Balance Summary Card */}
                     <div className="transaction-card-compact loan-card-compact">
                       <div className="transaction-card-header-compact">
-                        <AccountBalance sx={{ fontSize: 16, color: '#5c4730' }} />
+                        <AccountBalance sx={{ fontSize: 14, color: '#5c4730' }} />
                         <span>Loan Balance Summary</span>
                       </div>
                       <div className="transaction-card-content-compact">
@@ -973,7 +705,6 @@ const TransactionsPage = () => {
                           const loanDetails = calculateLoanDetails(selectedTransaction);
                           return (
                             <>
-                              {/* Current Loan Balance */}
                               <div className="transaction-detail-item-compact highlighted-compact">
                                 <span className="transaction-detail-label-compact">
                                   Current Loan Balance
@@ -983,7 +714,6 @@ const TransactionsPage = () => {
                                 </span>
                               </div>
 
-                              {/* Arrears Information */}
                               {loanDetails.arrearsAmount > 0 && (
                                 <div className="transaction-detail-item-compact arrears-info-compact">
                                   <span className="transaction-detail-label-compact">
@@ -995,7 +725,6 @@ const TransactionsPage = () => {
                                 </div>
                               )}
 
-                              {/* Total Repayments */}
                               <div className="transaction-detail-item-compact success-compact">
                                 <span className="transaction-detail-label-compact">
                                   Total Repayments Made
@@ -1007,7 +736,6 @@ const TransactionsPage = () => {
 
                               {selectedTransaction.status?.toUpperCase() === 'SUCCESS' ? (
                                 <>
-                                  {/* Total Cleared */}
                                   <div className="transaction-detail-item-compact total-cleared-compact">
                                     <span className="transaction-detail-label-compact">
                                       Total Cleared Now
@@ -1017,7 +745,6 @@ const TransactionsPage = () => {
                                     </span>
                                   </div>
 
-                                  {/* New Loan Balance */}
                                   <div className="transaction-detail-item-compact new-balance-compact">
                                     <span className="transaction-detail-label-compact">
                                       New Loan Balance
@@ -1032,21 +759,8 @@ const TransactionsPage = () => {
                                       )}
                                     </span>
                                   </div>
-
-                                  {/* Remaining Arrears */}
-                                  {loanDetails.remainingArrears > 0 && (
-                                    <div className="transaction-detail-item-compact">
-                                      <span className="transaction-detail-label-compact">
-                                        Remaining Arrears
-                                      </span>
-                                      <span className="transaction-detail-value-compact remaining-arrears-amount">
-                                        {formatCurrency(loanDetails.remainingArrears)}
-                                      </span>
-                                    </div>
-                                  )}
                                 </>
                               ) : (
-                                /* For non-successful transactions */
                                 <div className="transaction-detail-item-compact">
                                   <span className="transaction-detail-label-compact">
                                     Status Note
@@ -1065,7 +779,7 @@ const TransactionsPage = () => {
                     {/* Transaction Status Card */}
                     <div className="transaction-card-compact status-card-compact">
                       <div className="transaction-card-header-compact">
-                        <ReceiptLong sx={{ fontSize: 16, color: '#5c4730' }} />
+                        <ReceiptLong sx={{ fontSize: 14, color: '#5c4730' }} />
                         <span>Transaction Status</span>
                       </div>
                       <div className="transaction-status-wrapper-compact">
@@ -1094,271 +808,20 @@ const TransactionsPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Modal Footer */}
+              <div className="transaction-modal-footer">
+                <button
+                  className="transaction-modal-secondary-btn"
+                  onClick={handleCloseModal}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           )}
         </Box>
       </Modal>
-
-      {/* Payment Modal - IMPROVED DATA DISPLAY */}
-      {showPaymentModal && (
-        <div
-          className="payment-modal-overlay"
-          onClick={(e) => {
-            if (e.target.className === 'payment-modal-overlay') {
-              setShowPaymentModal(false);
-              setMpesaStatus(null);
-              setSelectedTransaction(null);
-              setCustomerDetails(null);
-            }
-          }}
-        >
-          <div className="payment-modal" onClick={(e) => e.stopPropagation()}>
-
-            <div className="payment-modal-header">
-              <Typography className="payment-modal-title">
-                Process Payment
-              </Typography>
-            </div>
-
-            <div className="payment-modal-body">
-              {/* Customer Information Section - IMPROVED */}
-              <div className="payment-info-container">
-                <div className="payment-info-item">
-                  <span className="payment-info-label">Customer:</span>
-                  <span className="payment-info-value">
-                    {customerDetails?.name ||
-                      selectedTransaction?.customerId?.name ||
-                      selectedTransaction?.customerName ||
-                      'Customer'}
-                  </span>
-                </div>
-                <div className="payment-info-item">
-                  <span className="payment-info-label">Customer ID:</span>
-                  <span className="payment-info-value">
-                    {customerDetails?.customerId ||
-                      selectedTransaction?.customerId?.customerId ||
-                      selectedTransaction?.customerId ||
-                      'N/A'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="payment-form-group">
-                <label className="payment-form-label">Primary Phone Number</label>
-                <input
-                  type="text"
-                  name="phoneNumber"
-                  value={paymentData.phoneNumber}
-                  onChange={handlePaymentInputChange}
-                  className="payment-form-input"
-                  placeholder="2547XXXXXXXX"
-                  maxLength="12"
-                  disabled={paymentData.useAlternativeNumber}
-                />
-                <div className="phone-number-note">
-                  {paymentData.phoneNumber ?
-                    'Customer\'s registered phone number' :
-                    'Enter customer phone number'}
-                </div>
-              </div>
-
-              {/* Alternative Phone Number Section */}
-              <div className="payment-form-group">
-                <div className="checkbox-container">
-                  <input
-                    type="checkbox"
-                    id="useAlternativeNumber"
-                    name="useAlternativeNumber"
-                    checked={paymentData.useAlternativeNumber}
-                    onChange={handlePaymentInputChange}
-                    className="checkbox-input"
-                  />
-                  <label htmlFor="useAlternativeNumber" className="checkbox-label">
-                    Use Alternative Phone Number
-                  </label>
-                </div>
-
-                <div className={`alternative-input-container ${paymentData.useAlternativeNumber ? 'active' : 'disabled'}`}>
-                  <label className="payment-form-label">Alternative Phone Number (254XXXXXXXXX)</label>
-                  <input
-                    type="text"
-                    name="alternativePhoneNumber"
-                    value={paymentData.alternativePhoneNumber}
-                    onChange={handlePaymentInputChange}
-                    className="payment-form-input"
-                    placeholder="2547XXXXXXXX"
-                    maxLength="12"
-                    disabled={!paymentData.useAlternativeNumber}
-                  />
-                  <div className="alternative-number-note">
-                    Use if primary number has insufficient funds
-                  </div>
-                </div>
-              </div>
-
-              <div className="payment-form-group">
-                <label className="payment-form-label">Amount (KES)</label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={paymentData.amount}
-                  onChange={handlePaymentInputChange}
-                  className="payment-form-input"
-                  placeholder="Enter amount"
-                  min="1"
-                  step="1"
-                />
-
-                {/* Payment Amount Suggestions - IMPROVED */}
-                <div className="payment-amount-suggestions">
-                  <button
-                    type="button"
-                    className="payment-amount-btn"
-                    onClick={() => {
-                      const arrearsAmount = customerDetails?.arrears ||
-                        selectedTransaction?.customerId?.arrears ||
-                        0;
-                      handleQuickAmount(arrearsAmount, 'arrears');
-                    }}
-                  >
-                    Arrears: {formatCurrency(customerDetails?.arrears ||
-                      selectedTransaction?.customerId?.arrears ||
-                      0)}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="payment-amount-btn"
-                    onClick={() => {
-                      const loanBalance = customerDetails?.loanBalance ||
-                        selectedTransaction?.customerId?.loanBalance ||
-                        0;
-                      handleQuickAmount(loanBalance, 'fullBalance');
-                    }}
-                    style={{ width: '100%' }}
-                  >
-                    Full Balance: {formatCurrency(customerDetails?.loanBalance ||
-                      selectedTransaction?.customerId?.loanBalance ||
-                      0)}
-                  </button>
-                </div>
-
-                <div className="daily-limit-info">
-                  <strong>Note:</strong> Daily MPESA limit is {formatCurrency(496500)}. Amounts exceeding this will be capped.
-                </div>
-              </div>
-
-              {/* Status Messages */}
-              {mpesaStatus && (
-                <div className={`mpesa-status ${mpesaStatus.status}`}>
-                  <div className="mpesa-status-icon">
-                    {mpesaStatus.status === 'success' ? '✅' :
-                      mpesaStatus.status === 'failed' ? '❌' : '⏳'}
-                  </div>
-                  <div className="mpesa-status-message">{mpesaStatus.message}</div>
-                  {mpesaStatus.checkoutId && (
-                    <div className="mpesa-status-details">
-                      Transaction ID: {mpesaStatus.checkoutId}
-                      <br />
-                      Phone Used: {mpesaStatus.phoneUsed}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="payment-modal-footer">
-              <button
-                className="payment-modal-cancel-btn"
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setMpesaStatus(null);
-                  // Clear transaction state when closing payment modal
-                  setSelectedTransaction(null);
-                  setCustomerDetails(null);
-                }}
-                disabled={processingPayment}
-              >
-                Cancel
-              </button>
-              <button
-                className="payment-modal-prompt-btn"
-                onClick={handleSendPrompt}
-                disabled={processingPayment || !paymentData.phoneNumber || !paymentData.amount}
-              >
-                {processingPayment ? 'Processing...' : 'Initiate Payment'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {showConfirmationModal && (
-        <div className="payment-modal-overlay">
-          <div className="confirmation-modal">
-            <div className="confirmation-modal-header">
-              <div className="confirmation-modal-icon">
-                <div className="mpesa-logo-text">MPESA</div>
-              </div>
-              <Typography className="confirmation-modal-title">
-                Confirm Payment Request
-              </Typography>
-            </div>
-
-            <div className="confirmation-modal-body">
-              <div className="confirmation-info">
-                <div className="confirmation-label">
-                  {paymentData.useAlternativeNumber ? 'Alternative Phone Number:' : 'Phone Number:'}
-                </div>
-                <div className="confirmation-phone">
-                  {paymentData.useAlternativeNumber ? paymentData.alternativePhoneNumber : paymentData.phoneNumber}
-                  {paymentData.useAlternativeNumber && (
-                    <div className="alternative-original-note">
-                      (Alternative to: {paymentData.phoneNumber})
-                    </div>
-                  )}
-                </div>
-                <div className="confirmation-label">
-                  Amount:
-                </div>
-                <div className="confirmation-amount">
-                  {formatCurrency(paymentData.amount)}
-                  {parseFloat(paymentData.amount) > 496500 && (
-                    <div className="daily-limit-warning">
-                      ⚠️ Daily limit applied: {formatCurrency(496500)}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="confirmation-note">
-                <strong>Note:</strong> Customer will receive a payment prompt on their phone and must enter their PIN to complete the transaction.
-                {parseFloat(paymentData.amount) > 496500 && (
-                  <div className="daily-limit-alert">
-                    <strong>⚠️ Daily Limit:</strong> Only {formatCurrency(496500)} can be collected at once (MPESA daily limit).
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="confirmation-modal-footer">
-              <button
-                className="confirmation-modal-cancel-btn"
-                onClick={() => setShowConfirmationModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="confirmation-modal-confirm-btn"
-                onClick={handleConfirmPayment}
-              >
-                Send Request
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </Box>
   );
 };
